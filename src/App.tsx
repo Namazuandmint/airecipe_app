@@ -75,7 +75,7 @@ const secondaryFeatures: Feature[] = [
     tone: 'red',
   },
   {
-    title: 'アカウント設定',
+    title: 'ああああああああああああ',
     description: '言語、ログアウト、ユーザー管理',
     action: '設定',
     icon: 'settings',
