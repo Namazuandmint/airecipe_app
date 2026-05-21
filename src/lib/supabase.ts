@@ -27,5 +27,5 @@ export async function checkSupabaseConnection(): Promise<SupabaseStatus> {
 }
 
 void checkSupabaseConnection().then((status) => {
-  console.info(`[あいくっく] ${status.message}`)
+  console.info(`[vite] ${status.message}`)
 })

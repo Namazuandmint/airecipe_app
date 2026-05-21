@@ -20,7 +20,7 @@ export async function testGroqConnection(prompt: string) {
   const trimmedPrompt = prompt.trim()
 
   if (!trimmedPrompt) {
-    console.error('[Groq test] prompt is required')
+    console.error('[vite] Groq test prompt is required')
     return
   }
 
@@ -46,16 +46,16 @@ export async function testGroqConnection(prompt: string) {
     const payload = (await response.json()) as GroqChatResponse
 
     if (!response.ok || !payload.ok) {
-      console.error('[Groq test] failed:', payload.message ?? response.statusText)
+      console.error('[vite] Groq test failed:', payload.message ?? response.statusText)
       return
     }
 
     const content = payload.completion?.choices?.[0]?.message?.content
-    console.info('[Groq test] response:', content ?? payload.completion)
+    console.info('[vite] Groq test response:', content ?? payload.completion)
   } catch (error) {
-    console.error('[Groq test] request failed:', error)
+    console.error('[vite] Groq test request failed:', error)
   }
 }
 
 window.testGroq = testGroqConnection
-console.info('[Groq test] ready: run window.testGroq("your prompt")')
+console.info('[vite] Groq test ready: run window.testGroq("your prompt")')

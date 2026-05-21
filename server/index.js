@@ -107,5 +107,5 @@ async function handleGroqChat(request, response) {
 }
 
 server.listen(port, () => {
-  console.info(`API server listening on http://localhost:${port}`)
+  console.info(`[node] API server listening on http://localhost:${port}`)
 })

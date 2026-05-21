@@ -1,0 +1,33 @@
+import { Icon } from './Icon'
+
+export function Topbar() {
+  return (
+    <header className="topbar">
+      <a className="brand" href="/" aria-label="あいくっく ホーム">
+        <span className="brand__mark">
+          <img src="/app-icon.png" alt="" />
+        </span>
+        <span>
+          <strong>あいくっく</strong>
+          <small>食材管理と献立づくり</small>
+        </span>
+      </a>
+
+      <nav className="topbar__nav" aria-label="メインメニュー">
+        <a href="#ingredients">食材</a>
+        <a href="#recipes">レシピ</a>
+        <a href="#shopping">買い物</a>
+      </nav>
+
+      <div className="topbar__actions">
+        <button type="button" className="icon-button" aria-label="通知">
+          <Icon name="bell" />
+        </button>
+        <button type="button" className="account-button">
+          <Icon name="user" />
+          <span>アカウント</span>
+        </button>
+      </div>
+    </header>
+  )
+}
