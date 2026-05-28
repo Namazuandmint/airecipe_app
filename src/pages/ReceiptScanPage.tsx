@@ -129,6 +129,7 @@ export function ReceiptScanPage({ onNavigate }: ReceiptScanPageProps) {
   const [isReading, setIsReading] = useState(false)
   const [isParsing, setIsParsing] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [importedCount, setImportedCount] = useState(0)
 
   async function parseOcrText(text: string, successMessage: string) {
     if (!text.trim()) {
@@ -171,6 +172,7 @@ export function ReceiptScanPage({ onNavigate }: ReceiptScanPageProps) {
     setPreviewUrl(URL.createObjectURL(file))
     setOcrText('')
     setCandidates([])
+    setImportedCount(0)
     setStatusMessage('')
     setErrorMessage('')
     setProgress(0)
@@ -226,6 +228,7 @@ export function ReceiptScanPage({ onNavigate }: ReceiptScanPageProps) {
 
     try {
       const result = await importReceiptItems(selectedItems)
+      setImportedCount(result.importedCount)
       setStatusMessage(`${result.importedCount}件の食材を在庫に登録しました`)
     } catch (error) {
       console.error('[vite] Receipt import failed:', error)
@@ -318,9 +321,18 @@ export function ReceiptScanPage({ onNavigate }: ReceiptScanPageProps) {
         </section>
 
         {statusMessage ? (
-          <p className="status-message" role="status">
-            {statusMessage}
-          </p>
+          <div className="status-message receipt-status" role="status">
+            <span>{statusMessage}</span>
+            {importedCount > 0 ? (
+              <button
+                type="button"
+                className="small-button"
+                onClick={() => onNavigate?.('fridge')}
+              >
+                在庫を見る
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         {errorMessage ? (

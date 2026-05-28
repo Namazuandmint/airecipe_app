@@ -991,6 +991,17 @@ button:disabled {
   color: var(--ink);
 }
 
+.receipt-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.receipt-status .small-button {
+  flex: 0 0 auto;
+}
+
 .receipt-text-panel textarea {
   width: 100%;
   min-height: 342px;
@@ -1156,6 +1167,7 @@ button:disabled {
   .modal-actions,
   .cook-complete-panel,
   .recipe-detail__toolbar,
+  .receipt-status,
   .history-error {
     flex-direction: column;
   }
