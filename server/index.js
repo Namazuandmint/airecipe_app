@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { pathToFileURL } from 'node:url'
 import {
   checkGroqConnection,
   createGroqChatCompletion,
@@ -109,7 +110,7 @@ function sendJson(response, statusCode, payload) {
   response.end(JSON.stringify(payload))
 }
 
-const server = createServer((request, response) => {
+export async function handleApiRequest(request, response) {
   if (request.method === 'OPTIONS') {
     response.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -183,7 +184,7 @@ const server = createServer((request, response) => {
     ok: false,
     message: 'Not found',
   })
-})
+}
 
 async function readJsonBody(request) {
   const chunks = []
@@ -433,6 +434,10 @@ async function handleRecipeFavorite(request, response) {
   }
 }
 
-server.listen(port, () => {
-  console.info(`[node] API server listening on http://localhost:${port}`)
-})
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const server = createServer(handleApiRequest)
+
+  server.listen(port, () => {
+    console.info(`[node] API server listening on http://localhost:${port}`)
+  })
+}
