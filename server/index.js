@@ -163,6 +163,19 @@ function isLocalRequest(request) {
   return host.startsWith('localhost') || host.startsWith('127.0.0.1')
 }
 
+function isLocalOrigin(origin) {
+  if (!origin) {
+    return false
+  }
+
+  try {
+    const url = new URL(origin)
+    return url.hostname === 'localhost' || url.hostname === '127.0.0.1'
+  } catch {
+    return false
+  }
+}
+
 function serializeCookie(request, name, value, options = {}) {
   const secure = !isLocalRequest(request)
   const parts = [
@@ -216,6 +229,12 @@ function createClearAuthCookieHeaders(request) {
 }
 
 function getRequestOrigin(request) {
+  const origin = request.headers.origin
+
+  if (isLocalOrigin(origin)) {
+    return origin.replace(/\/$/, '')
+  }
+
   const explicitAppUrl =
     process.env.APP_URL ??
     process.env.PUBLIC_APP_URL ??
@@ -224,8 +243,6 @@ function getRequestOrigin(request) {
   if (explicitAppUrl) {
     return explicitAppUrl.replace(/\/$/, '')
   }
-
-  const origin = request.headers.origin
 
   if (origin) {
     return origin.replace(/\/$/, '')
