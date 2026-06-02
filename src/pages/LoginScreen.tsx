@@ -76,7 +76,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
     setErrorMessage("");
 
     try {
-      const result = await createGoogleLoginUrl();
+      const result = await createGoogleLoginUrl(window.location.origin);
       window.location.href = result.url;
     } catch (error) {
       setErrorMessage(
@@ -97,7 +97,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
     setErrorMessage("");
 
     try {
-      await sendPasswordResetEmail(email);
+      await sendPasswordResetEmail(email, window.location.origin);
       setStatusMessage(t("login.resetSent"));
     } catch (error) {
       setErrorMessage(

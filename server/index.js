@@ -228,11 +228,15 @@ function createClearAuthCookieHeaders(request) {
   }
 }
 
-function getRequestOrigin(request) {
+function getRequestOrigin(request, requestedOrigin) {
   const origin = request.headers.origin
 
   if (isLocalOrigin(origin)) {
     return origin.replace(/\/$/, '')
+  }
+
+  if (isLocalRequest(request) && isLocalOrigin(requestedOrigin)) {
+    return requestedOrigin.replace(/\/$/, '')
   }
 
   const explicitAppUrl =
@@ -600,12 +604,15 @@ async function handleAuthRegister(request, response) {
 async function handleAuthGoogle(request, response) {
   try {
     const body = await readJsonBody(request)
+    const redirectTo =
+      getRequestOrigin(request, body?.redirectTo) ?? body?.redirectTo
     const result = await createGoogleLoginUrl({
-      redirectTo: getRequestOrigin(request) ?? body?.redirectTo,
+      redirectTo,
     })
 
     sendJson(response, 200, {
       ok: true,
+      redirectTo,
       ...result,
     })
   } catch (error) {
@@ -685,7 +692,7 @@ async function handleAuthPasswordReset(request, response) {
 
     const result = await sendPasswordResetEmail({
       email: body.email,
-      redirectTo: getRequestOrigin(request) ?? body?.redirectTo,
+      redirectTo: getRequestOrigin(request, body?.redirectTo) ?? body?.redirectTo,
     })
 
     sendJson(response, 200, {
