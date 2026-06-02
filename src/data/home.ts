@@ -85,7 +85,7 @@ export const suggestedRecipes: Recipe[] = [
     cookTime: 25,
     servings: 1,
     difficulty: 'かんたん',
-    reason: '期限が近い鮭と小松菜、牛乳をまとめて使えるため',
+    reason: '期限が近い鮭と小松菜、牛乳をまとめて使える',
     ingredients: [
       { ingredientId: 1, name: '鮭切り身', amount: 120, unit: 'g' },
       { ingredientId: 2, name: '小松菜', amount: 0.5, unit: '束' },
