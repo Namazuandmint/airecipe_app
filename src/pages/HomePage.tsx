@@ -14,7 +14,16 @@ import {
   generateRecipes,
   markRecipeCooked,
 } from '../lib/recipeApi'
-import type { AppDestination, Ingredient, Recipe } from '../types/ui'
+import {
+  defaultPreferences,
+  fetchPreferences,
+} from '../lib/preferencesApi'
+import type {
+  AppDestination,
+  Ingredient,
+  Recipe,
+  UserPreferences,
+} from '../types/ui'
 
 type HomePageProps = {
   onNavigate?: (page: AppDestination) => void
@@ -22,7 +31,7 @@ type HomePageProps = {
   onLogout?: () => void | Promise<void>
 }
 
-function isNearExpiration(ingredient: Ingredient) {
+function isNearExpiration(ingredient: Ingredient, leadDays = 3) {
   if (!ingredient.expirationDate) {
     return false
   }
@@ -39,15 +48,24 @@ function isNearExpiration(ingredient: Ingredient) {
     (expiration.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
   )
 
-  return diffDays >= 0 && diffDays <= 3
+  return diffDays >= 0 && diffDays <= leadDays
 }
 
 function buildSummaryItems(
   ingredients: Ingredient[],
   recipes: Recipe[],
+  preferences: UserPreferences,
   t: TranslateFn,
 ) {
-  const nearExpirationCount = ingredients.filter(isNearExpiration).length
+  const leadDays = preferences.notifications.expiration
+    ? preferences.notifications.expirationLeadDays
+    : 0
+  const nearExpirationCount =
+    leadDays > 0
+      ? ingredients.filter((ingredient) =>
+          isNearExpiration(ingredient, leadDays),
+        ).length
+      : 0
   const favoriteCount = recipes.filter((recipe) => recipe.isFavorite).length
 
   return [
@@ -63,7 +81,7 @@ function buildSummaryItems(
       value: String(nearExpirationCount),
       note:
         nearExpirationCount > 0
-          ? t('home.summary.nearExpirationNote')
+          ? t('home.summary.nearExpirationNote', { days: leadDays })
           : t('home.summary.nearExpirationEmptyNote'),
     },
     {
@@ -86,7 +104,7 @@ export function HomePage({
   onSelectRecipe,
   onLogout,
 }: HomePageProps) {
-  const { t } = useI18n()
+  const { language, t } = useI18n()
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
@@ -94,16 +112,18 @@ export function HomePage({
   const [statusMessage, setStatusMessage] = useState('')
   const [cookingRecipe, setCookingRecipe] = useState<Recipe | null>(null)
   const [servings, setServings] = useState(1)
+  const [preferences, setPreferences] =
+    useState<UserPreferences>(defaultPreferences)
   const secondaryFeatures = useMemo(() => getSecondaryFeatures(t), [t])
   const currentSummaryItems = useMemo(
-    () => buildSummaryItems(ingredients, recipes, t),
-    [ingredients, recipes, t],
+    () => buildSummaryItems(ingredients, recipes, preferences, t),
+    [ingredients, preferences, recipes, t],
   )
 
   useEffect(() => {
     let isMounted = true
 
-    fetchInventory()
+    fetchInventory(language)
       .then((result) => {
         if (isMounted) {
           setIngredients(result.inventory)
@@ -120,7 +140,7 @@ export function HomePage({
         }
       })
 
-    fetchSavedRecipes()
+    fetchSavedRecipes(language)
       .then((result) => {
         if (isMounted) {
           setRecipes(result.recipes)
@@ -130,10 +150,20 @@ export function HomePage({
         console.warn('[vite] Saved recipes fetch failed:', error)
       })
 
+    fetchPreferences()
+      .then((result) => {
+        if (isMounted) {
+          setPreferences(result.preferences)
+        }
+      })
+      .catch((error) => {
+        console.warn('[vite] Preferences fetch failed:', error)
+      })
+
     return () => {
       isMounted = false
     }
-  }, [t])
+  }, [language, t])
 
   function navigateToReceipt() {
     onNavigate?.('receipt')
@@ -153,7 +183,11 @@ export function HomePage({
     setStatusMessage('')
 
     try {
-      const result = await generateRecipes(2)
+      const result = await generateRecipes(
+        preferences.defaultServings,
+        language,
+        preferences.avoidedIngredients,
+      )
 
       if (result.recipes.length) {
         setRecipes(result.recipes)
@@ -184,7 +218,11 @@ export function HomePage({
     setStatusMessage('')
 
     try {
-      const result = await markRecipeCooked(cookingRecipe.recipeId, servings)
+      const result = await markRecipeCooked(
+        cookingRecipe.recipeId,
+        servings,
+        language,
+      )
       setIngredients(result.inventory)
       setStatusMessage(t('home.status.cookingUpdated', { servings }))
       setCookingRecipe(null)

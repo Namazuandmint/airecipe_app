@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Topbar } from '../components/Topbar'
 import { generateGeminiContent } from '../lib/geminiApi'
+import { useI18n } from '../lib/useI18n'
 import type { AppDestination } from '../types/ui'
 
 type GeminiTestPageProps = {
@@ -23,9 +24,8 @@ export function GeminiTestPage({
   onNavigate,
   onLogout,
 }: GeminiTestPageProps) {
-  const [prompt, setPrompt] = useState(
-    'この画像に写っているものを日本語で簡潔に説明してください。',
-  )
+  const { t } = useI18n()
+  const [prompt, setPrompt] = useState(t('gemini.promptDefault'))
   const [imageBase64, setImageBase64] = useState('')
   const [imageMimeType, setImageMimeType] = useState('')
   const [previewUrl, setPreviewUrl] = useState('')
@@ -54,17 +54,17 @@ export function GeminiTestPage({
     setImageMimeType(file.type || 'image/jpeg')
     setPreviewUrl(URL.createObjectURL(file))
     setImageBase64(await readFileAsDataUrl(file))
-    setStatusMessage('画像を読み込みました')
+    setStatusMessage(t('gemini.imageLoaded'))
   }
 
   async function handleSubmit() {
     if (!prompt.trim()) {
-      setErrorMessage('プロンプトを入力してください')
+      setErrorMessage(t('gemini.promptRequired'))
       return
     }
 
     setIsSending(true)
-    setStatusMessage('Geminiに送信しています...')
+    setStatusMessage(t('gemini.sendingStatus'))
     setErrorMessage('')
     setResponseText('')
     setResponseImages([])
@@ -78,16 +78,16 @@ export function GeminiTestPage({
         model: geminiTestModel,
       })
 
-      setResponseText(result.text || 'テキストレスポンスはありませんでした')
+      setResponseText(result.text || t('gemini.noText'))
       setResponseImages(result.images)
       setRawResponse(JSON.stringify(result.raw, null, 2))
       setStatusMessage(
-        `Geminiからレスポンスを受け取りました。使用モデル: ${result.model}`,
+        t('gemini.success', { model: result.model }),
       )
     } catch (error) {
       console.error('[vite] Gemini test failed:', error)
       setErrorMessage(
-        error instanceof Error ? error.message : 'Geminiリクエストに失敗しました',
+        error instanceof Error ? error.message : t('gemini.failed'),
       )
       setStatusMessage('')
     } finally {
@@ -103,14 +103,14 @@ export function GeminiTestPage({
         <div className="fridge-header">
           <div>
             <p className="eyebrow">Gemini API Test</p>
-            <h1>画像受け渡しテスト</h1>
+            <h1>{t('gemini.title')}</h1>
           </div>
           <button
             type="button"
             className="secondary-button back-home-button"
             onClick={() => onNavigate?.('home')}
           >
-            ホームに戻る
+            {t('common.backHome')}
           </button>
         </div>
 
@@ -119,17 +119,17 @@ export function GeminiTestPage({
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Input</p>
-                <h2>Geminiに送る内容</h2>
+                <h2>{t('gemini.inputTitle')}</h2>
               </div>
             </div>
 
             <div className="test-model-label">
-              <span>モデル</span>
+              <span>{t('gemini.model')}</span>
               <strong>{geminiTestModel}</strong>
             </div>
 
             <label>
-              <span>プロンプト</span>
+              <span>{t('gemini.prompt')}</span>
               <textarea
                 value={prompt}
                 onChange={(event) => setPrompt(event.target.value)}
@@ -144,17 +144,17 @@ export function GeminiTestPage({
                   handleImageChange(event.currentTarget.files?.[0] ?? null)
                 }
               />
-              <span>画像を選ぶ</span>
+              <span>{t('gemini.chooseImage')}</span>
             </label>
 
             {previewUrl ? (
               <img
                 className="test-image-preview"
                 src={previewUrl}
-                alt="Geminiに送る画像"
+                alt={t('gemini.imageAlt')}
               />
             ) : (
-              <div className="receipt-placeholder">画像未選択</div>
+              <div className="receipt-placeholder">{t('gemini.noImage')}</div>
             )}
 
             <button
@@ -163,7 +163,7 @@ export function GeminiTestPage({
               onClick={handleSubmit}
               disabled={isSending}
             >
-              {isSending ? '送信中...' : 'Geminiに送信'}
+              {isSending ? t('gemini.sending') : t('gemini.submit')}
             </button>
           </div>
 
@@ -171,7 +171,7 @@ export function GeminiTestPage({
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Output</p>
-                <h2>レスポンス</h2>
+                <h2>{t('gemini.outputTitle')}</h2>
               </div>
             </div>
 
@@ -188,7 +188,7 @@ export function GeminiTestPage({
             ) : null}
 
             <div className="test-response-box">
-              {responseText || 'まだレスポンスはありません。'}
+              {responseText || t('gemini.noResponse')}
             </div>
 
             {responseImages.length ? (
@@ -197,7 +197,7 @@ export function GeminiTestPage({
                   <img
                     key={`${image.mimeType}-${index}`}
                     src={`data:${image.mimeType};base64,${image.data}`}
-                    alt={`Geminiから返された画像 ${index + 1}`}
+                    alt={t('gemini.responseImageAlt', { number: index + 1 })}
                   />
                 ))}
               </div>

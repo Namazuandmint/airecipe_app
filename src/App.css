@@ -1365,6 +1365,98 @@ button:disabled {
   color: var(--ink);
 }
 
+.settings-preferences-form {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-field {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.settings-field label,
+.settings-field > span,
+.settings-fieldset legend {
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.settings-field label span,
+.settings-field > label span,
+.settings-fieldset p {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.settings-field input,
+.settings-field textarea,
+.settings-field--inline input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+}
+
+.settings-field input,
+.settings-field--inline input {
+  height: 44px;
+  padding: 0 12px;
+}
+
+.settings-field textarea {
+  min-height: 104px;
+  padding: 12px;
+  resize: vertical;
+}
+
+.settings-fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.settings-fieldset p {
+  margin: 0;
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.settings-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ink);
+}
+
+.settings-field--inline {
+  grid-template-columns: 1fr 110px;
+  align-items: center;
+  padding: 0;
+  background: transparent;
+}
+
+.settings-save-button {
+  justify-self: start;
+}
+
 .settings-session-row {
   display: flex;
   align-items: center;
@@ -1527,6 +1619,10 @@ button:disabled {
   }
 
   .receipt-candidate {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-field--inline {
     grid-template-columns: 1fr;
   }
 

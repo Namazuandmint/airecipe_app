@@ -33,6 +33,10 @@ import {
   importReceiptItems,
   parseReceiptText,
 } from './receipts.js'
+import {
+  getUserPreferences,
+  updateUserPreferences,
+} from './preferences.js'
 import { checkSupabaseConnection } from './supabase.js'
 import pg from 'pg'
 const { Pool } = pg
@@ -313,7 +317,7 @@ export async function handleApiRequest(request, response) {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/inventory') {
-    await handleInventory(authUser.id, response)
+    await handleInventory(authUser.id, response, url.searchParams.get('language'))
     return
   }
 
@@ -332,13 +336,31 @@ export async function handleApiRequest(request, response) {
     return
   }
 
+  if (request.method === 'GET' && url.pathname === '/api/preferences') {
+    await handlePreferences(authUser.id, response)
+    return
+  }
+
+  if (request.method === 'PATCH' && url.pathname === '/api/preferences') {
+    await handlePreferencesUpdate(request, response, authUser.id)
+    return
+  }
+
   if (request.method === 'GET' && url.pathname === '/api/cooking-history') {
-    await handleCookingHistory(authUser.id, response)
+    await handleCookingHistory(
+      authUser.id,
+      response,
+      url.searchParams.get('language'),
+    )
     return
   }
 
   if (request.method === 'GET' && url.pathname === '/api/recipes/saved') {
-    await handleSavedRecipes(authUser.id, response)
+    await handleSavedRecipes(
+      authUser.id,
+      response,
+      url.searchParams.get('language'),
+    )
     return
   }
 
@@ -777,9 +799,9 @@ async function handleUserFridge(userId, response) {
   }
 }
 
-async function handleInventory(userId, response) {
+async function handleInventory(userId, response, language) {
   try {
-    const inventory = await getInventoryForUser(userId)
+    const inventory = await getInventoryForUser(userId, language)
     sendJson(response, 200, {
       ok: true,
       ...inventory,
@@ -857,12 +879,54 @@ async function handleInventoryDelete(request, response, userId) {
   }
 }
 
-async function handleRecipeGeneration(request, response, userId) {
+async function handlePreferences(userId, response) {
+  try {
+    const result = await getUserPreferences(userId)
+
+    sendJson(response, 200, {
+      ok: true,
+      ...result,
+    })
+  } catch (error) {
+    sendJson(response, 500, {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : 'Preferences request failed',
+    })
+  }
+}
+
+async function handlePreferencesUpdate(request, response, userId) {
   try {
     const body = await readJsonBody(request)
+    const result = await updateUserPreferences({
+      userId,
+      preferences: body?.preferences,
+    })
+
+    sendJson(response, 200, {
+      ok: true,
+      ...result,
+    })
+  } catch (error) {
+    sendJson(response, 500, {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : 'Preferences update failed',
+    })
+  }
+}
+
+async function handleRecipeGeneration(request, response, userId) {
+  let body = null
+
+  try {
+    body = await readJsonBody(request)
     const result = await generateAndSaveRecipes({
       userId,
       servings: body?.servings,
+      language: body?.language,
+      avoidedIngredients: body?.avoidedIngredients,
     })
 
     sendJson(response, 200, {
@@ -875,7 +939,11 @@ async function handleRecipeGeneration(request, response, userId) {
       : 500
     const message =
       error instanceof Error && error.message === 'Inventory is empty'
-        ? '食材を登録してからレシピを生成してください。'
+        ? body?.language === 'en'
+          ? 'Add ingredients before generating recipes.'
+          : body?.language === 'fr'
+            ? 'Ajoutez des ingrédients avant de générer des recettes.'
+            : '食材を登録してからレシピを生成してください。'
         : error instanceof Error
           ? error.message
           : 'Recipe generation failed'
@@ -887,9 +955,9 @@ async function handleRecipeGeneration(request, response, userId) {
   }
 }
 
-async function handleCookingHistory(userId, response) {
+async function handleCookingHistory(userId, response, language) {
   try {
-    const history = await getCookingHistoryForUser(userId)
+    const history = await getCookingHistoryForUser(userId, language)
     sendJson(response, 200, {
       ok: true,
       ...history,
@@ -905,9 +973,9 @@ async function handleCookingHistory(userId, response) {
   }
 }
 
-async function handleSavedRecipes(userId, response) {
+async function handleSavedRecipes(userId, response, language) {
   try {
-    const recipes = await getSavedRecipesForUser(userId)
+    const recipes = await getSavedRecipesForUser(userId, language)
     sendJson(response, 200, {
       ok: true,
       ...recipes,
@@ -930,6 +998,7 @@ async function handleRecipeCooked(request, response, userId) {
       recipeId: body?.recipeId,
       servings: body?.servings,
       userId,
+      language: body?.language,
     })
 
     sendJson(response, 200, {

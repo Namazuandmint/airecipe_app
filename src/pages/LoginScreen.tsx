@@ -6,12 +6,14 @@ import {
   sendPasswordResetEmail,
   type AuthUser,
 } from "../lib/authApi";
+import { useI18n } from "../lib/useI18n";
 
 type LoginScreenProps = {
   onAuthenticated?: (user: AuthUser) => void;
 };
 
 export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -27,11 +29,11 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
 
     try {
       const result = await loginWithPassword(email, password);
-      setStatusMessage("ログインしました");
+      setStatusMessage(t("login.success"));
       onAuthenticated?.(result.user);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "ログインに失敗しました",
+        error instanceof Error ? error.message : t("login.failed"),
       );
     } finally {
       setIsLoading(false);
@@ -40,7 +42,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
 
   const handleRegister = async () => {
     if (!email || !password) {
-      setErrorMessage("メールアドレスとパスワードを入力してください");
+      setErrorMessage(t("login.emailPasswordRequired"));
       return;
     }
 
@@ -52,8 +54,8 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
       const result = await registerWithPassword(email, password);
       setStatusMessage(
         result.needsEmailConfirmation
-          ? "確認メールを送信しました。メール内のリンクから登録を完了してください。"
-          : "ユーザー登録が完了しました",
+          ? t("login.confirmationSent")
+          : t("login.registerSuccess"),
       );
 
       if (result.user && !result.needsEmailConfirmation) {
@@ -61,7 +63,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
       }
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "ユーザー登録に失敗しました",
+        error instanceof Error ? error.message : t("login.registerFailed"),
       );
     } finally {
       setIsLoading(false);
@@ -78,7 +80,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
       window.location.href = result.url;
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "Googleログインに失敗しました",
+        error instanceof Error ? error.message : t("login.googleFailed"),
       );
       setIsLoading(false);
     }
@@ -86,7 +88,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
 
   const handlePasswordReset = async () => {
     if (!email) {
-      setErrorMessage("パスワード再設定にはメールアドレスが必要です");
+      setErrorMessage(t("login.resetEmailRequired"));
       return;
     }
 
@@ -96,12 +98,12 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
 
     try {
       await sendPasswordResetEmail(email, window.location.origin);
-      setStatusMessage("パスワード再設定メールを送信しました");
+      setStatusMessage(t("login.resetSent"));
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : "パスワード再設定メールの送信に失敗しました",
+          : t("login.resetFailed"),
       );
     } finally {
       setIsLoading(false);
@@ -124,7 +126,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
 
         {/* メールアドレス入力 */}
         <div style={styles.inputGroup}>
-          <label style={styles.label}>メールアドレス</label>
+          <label style={styles.label}>{t("login.email")}</label>
           <input
             type="email"
             value={email}
@@ -145,7 +147,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
 
         {/* パスワード入力 */}
         <div style={styles.inputGroup}>
-          <label style={styles.label}>パスワード</label>
+          <label style={styles.label}>{t("login.password")}</label>
           <input
             type="password"
             value={password}
@@ -168,7 +170,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             onClick={handlePasswordReset}
             disabled={isLoading}
           >
-            パスワードを忘れた方
+            {t("login.forgotPassword")}
           </button>
         </div>
 
@@ -201,13 +203,13 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             (e.currentTarget as HTMLButtonElement).style.background = "#333333";
           }}
         >
-          {isLoading ? "ログイン中..." : "ログイン"}
+          {isLoading ? t("login.loading") : t("login.submit")}
         </button>
 
         {/* 区切り線 */}
         <div style={styles.divider}>
           <span style={styles.dividerLine} />
-          <span style={styles.dividerText}>または</span>
+          <span style={styles.dividerText}>{t("login.or")}</span>
           <span style={styles.dividerLine} />
         </div>
 
@@ -225,7 +227,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             (e.currentTarget as HTMLButtonElement).style.borderColor = "#D8DDE3";
           }}
         >
-          ユーザー登録
+          {t("login.register")}
         </button>
 
         {/* Googleログインボタン */}
@@ -246,7 +248,7 @@ export default function LoginScreen({ onAuthenticated }: LoginScreenProps) {
             <path d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/>
             <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
           </svg>
-          Googleでログイン
+          {t("login.google")}
         </button>
       </form>
 

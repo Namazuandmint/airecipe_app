@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Topbar } from '../components/Topbar'
 import { Icon } from '../components/Icon'
+import { useI18n } from '../lib/useI18n'
 import {
   createInventoryItem,
   deleteInventoryItem,
@@ -17,7 +18,7 @@ type Summary = {
   nearExpirationCount: number
 }
 
-const allCategoryLabel = 'すべて'
+const allCategoryKey = '__all__'
 
 type IngredientFormState = {
   inventoryId?: number
@@ -59,7 +60,7 @@ function isNearExpiration(expirationDate: string | null | undefined) {
   return diffDays >= 0 && diffDays <= 3
 }
 
-function formatDate(value: string | null | undefined) {
+function formatDate(value: string | null | undefined, language: string) {
   if (!value) {
     return '-'
   }
@@ -70,7 +71,10 @@ function formatDate(value: string | null | undefined) {
     return value
   }
 
-  return `${date.getMonth() + 1}月${date.getDate()}日`
+  return new Intl.DateTimeFormat(language, {
+    month: 'short',
+    day: 'numeric',
+  }).format(date)
 }
 
 function buildSummary(ingredients: Ingredient[]): Summary {
@@ -115,11 +119,12 @@ export function FridgePage({
   onNavigate: (page: AppDestination) => void
   onLogout?: () => void | Promise<void>
 }) {
+  const { language, t } = useI18n()
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState('')
-  const [activeCategory, setActiveCategory] = useState(allCategoryLabel)
+  const [activeCategory, setActiveCategory] = useState(allCategoryKey)
   const [formState, setFormState] = useState<IngredientFormState>(emptyForm)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -139,17 +144,17 @@ export function FridgePage({
     [ingredients],
   )
   const categories = useMemo(
-    () => [allCategoryLabel, ...Object.keys(groupedIngredients)],
+    () => [allCategoryKey, ...Object.keys(groupedIngredients)],
     [groupedIngredients],
   )
   const displayActiveCategory = categories.includes(activeCategory)
     ? activeCategory
-    : allCategoryLabel
+    : allCategoryKey
 
   useEffect(() => {
     let isMounted = true
 
-    fetchInventory()
+    fetchInventory(language)
       .then((result) => {
         if (isMounted) {
           setIngredients(result.inventory)
@@ -161,7 +166,7 @@ export function FridgePage({
           setError(
             fetchError instanceof Error
               ? fetchError.message
-              : '食材の取得に失敗しました',
+              : t('fridge.fetchFailed'),
           )
         }
       })
@@ -174,7 +179,7 @@ export function FridgePage({
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [language, t])
 
   function openAddForm() {
     setFormState(emptyForm)
@@ -209,7 +214,7 @@ export function FridgePage({
     const input = toMutationInput(formState)
 
     if (!input.name) {
-      setFormError('食材名を入力してください')
+      setFormError(t('fridge.form.nameRequired'))
       return
     }
 
@@ -222,13 +227,15 @@ export function FridgePage({
         ? await updateInventoryItem(input)
         : await createInventoryItem(input)
       setIngredients(result.inventory)
-      setStatusMessage(input.inventoryId ? '食材を更新しました' : '食材を追加しました')
+      setStatusMessage(
+        input.inventoryId ? t('fridge.status.updated') : t('fridge.status.added'),
+      )
       setIsFormOpen(false)
     } catch (submitError) {
       setFormError(
         submitError instanceof Error
           ? submitError.message
-          : '食材の保存に失敗しました',
+          : t('fridge.status.saveFailed'),
       )
     } finally {
       setIsSaving(false)
@@ -240,7 +247,9 @@ export function FridgePage({
       return
     }
 
-    const confirmed = window.confirm(`${ingredient.name}を削除しますか？`)
+    const confirmed = window.confirm(
+      t('fridge.confirmDelete', { name: ingredient.name }),
+    )
 
     if (!confirmed) {
       return
@@ -252,12 +261,12 @@ export function FridgePage({
     try {
       const result = await deleteInventoryItem(ingredient.inventoryId)
       setIngredients(result.inventory)
-      setStatusMessage('食材を削除しました')
+      setStatusMessage(t('fridge.status.deleted'))
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
           ? deleteError.message
-          : '食材の削除に失敗しました',
+          : t('fridge.status.deleteFailed'),
       )
     }
   }
@@ -268,7 +277,7 @@ export function FridgePage({
         <Topbar onNavigate={onNavigate} onLogout={onLogout} />
         <div className="fridge-loading">
           <div className="loading-spinner" />
-          <p>冷蔵庫の食材を読み込み中...</p>
+          <p>{t('fridge.loading')}</p>
         </div>
       </div>
     )
@@ -279,13 +288,13 @@ export function FridgePage({
       <div className="app-shell">
         <Topbar onNavigate={onNavigate} onLogout={onLogout} />
         <div className="fridge-error">
-          <p>食材の取得に失敗しました: {error}</p>
+          <p>{t('fridge.fetchFailed')}: {error}</p>
           <button
             type="button"
             className="primary-button"
             onClick={() => window.location.reload()}
           >
-            再読み込み
+            {t('common.reload')}
           </button>
         </div>
       </div>
@@ -298,7 +307,7 @@ export function FridgePage({
 
       <main className="fridge-container">
         <div className="fridge-header">
-          <h1>冷蔵庫の食材一覧</h1>
+          <h1>{t('fridge.title')}</h1>
           <div className="fridge-header-actions">
             <button
               type="button"
@@ -306,7 +315,7 @@ export function FridgePage({
               onClick={openAddForm}
             >
               <Icon name="plus" />
-              <span>食材を追加</span>
+              <span>{t('fridge.addIngredient')}</span>
             </button>
             <button
               type="button"
@@ -316,7 +325,7 @@ export function FridgePage({
               <div style={{ transform: 'scaleX(-1)', display: 'inline-flex' }}>
                 <Icon name="arrow" />
               </div>
-              <span>ホームに戻る</span>
+              <span>{t('common.backHome')}</span>
             </button>
           </div>
         </div>
@@ -327,26 +336,28 @@ export function FridgePage({
           </p>
         ) : null}
 
-        <section className="fridge-summary" aria-label="冷蔵庫の集計">
+        <section className="fridge-summary" aria-label={t('fridge.summaryLabel')}>
           <div className="summary-card">
-            <span className="card-label">登録食材数</span>
+            <span className="card-label">{t('fridge.summary.total')}</span>
             <strong className="card-value">{summary.totalCount}</strong>
-            <span className="card-note">ログイン中のユーザーの食材</span>
+            <span className="card-note">{t('fridge.summary.totalNote')}</span>
           </div>
           <div className="summary-card">
-            <span className="card-label">種類数</span>
+            <span className="card-label">{t('fridge.summary.unique')}</span>
             <strong className="card-value">{summary.uniqueNamesCount}</strong>
-            <span className="card-note">食材名のバリエーション</span>
+            <span className="card-note">{t('fridge.summary.uniqueNote')}</span>
           </div>
           <div className="summary-card">
-            <span className="card-label">使用中</span>
+            <span className="card-label">{t('fridge.summary.opened')}</span>
             <strong className="card-value">{summary.openedCount}</strong>
-            <span className="card-note">開封状態は未連携</span>
+            <span className="card-note">{t('fridge.summary.openedNote')}</span>
           </div>
           <div className="summary-card near-expiration">
-            <span className="card-label">期限が近い</span>
+            <span className="card-label">{t('fridge.summary.nearExpiration')}</span>
             <strong className="card-value">{summary.nearExpirationCount}</strong>
-            <span className="card-note">残り3日以内の食材</span>
+            <span className="card-note">
+              {t('fridge.summary.nearExpirationNote')}
+            </span>
           </div>
         </section>
 
@@ -360,7 +371,7 @@ export function FridgePage({
               }`}
               onClick={() => setActiveCategory(category)}
             >
-              {category}
+              {category === allCategoryKey ? t('fridge.filter.all') : category}
             </button>
           ))}
         </div>
@@ -368,13 +379,13 @@ export function FridgePage({
         <div className="fridge-tables">
           {ingredients.length === 0 ? (
             <div className="empty-state">
-              このユーザーの食材はまだ登録されていません。
+              {t('fridge.empty')}
             </div>
           ) : (
             Object.entries(groupedIngredients)
               .filter(
                 ([category]) =>
-                  displayActiveCategory === allCategoryLabel ||
+                  displayActiveCategory === allCategoryKey ||
                   displayActiveCategory === category,
               )
               .map(([category, items]) => (
@@ -384,11 +395,11 @@ export function FridgePage({
                     <table className="fridge-table">
                       <thead>
                         <tr>
-                          <th>食材</th>
-                          <th>在庫</th>
-                          <th>メモ</th>
-                          <th>消費期限</th>
-                          <th>操作</th>
+                          <th>{t('fridge.table.ingredient')}</th>
+                          <th>{t('fridge.table.stock')}</th>
+                          <th>{t('fridge.table.memo')}</th>
+                          <th>{t('fridge.table.expiration')}</th>
+                          <th>{t('fridge.table.actions')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -420,7 +431,7 @@ export function FridgePage({
                                     isWarning ? 'expiration-warning' : ''
                                   }
                                 >
-                                  {formatDate(item.expirationDate)}
+                                  {formatDate(item.expirationDate, language)}
                                 </span>
                               </td>
                               <td>
@@ -430,14 +441,14 @@ export function FridgePage({
                                     className="small-button"
                                     onClick={() => openEditForm(item)}
                                   >
-                                    編集
+                                    {t('fridge.action.edit')}
                                   </button>
                                   <button
                                     type="button"
                                     className="small-button danger-button"
                                     onClick={() => void handleDeleteIngredient(item)}
                                   >
-                                    削除
+                                    {t('fridge.action.delete')}
                                   </button>
                                 </div>
                               </td>
@@ -463,33 +474,37 @@ export function FridgePage({
             onSubmit={handleSubmitIngredient}
           >
             <p className="eyebrow">
-              {formState.inventoryId ? '食材編集' : '食材追加'}
+              {formState.inventoryId
+                ? t('fridge.form.editEyebrow')
+                : t('fridge.form.addEyebrow')}
             </p>
             <h2 id="ingredient-modal-title">
-              {formState.inventoryId ? '食材を編集' : '食材を追加'}
+              {formState.inventoryId
+                ? t('fridge.form.editTitle')
+                : t('fridge.form.addTitle')}
             </h2>
 
             <div className="ingredient-form-grid">
               <label>
-                <span>食材名</span>
+                <span>{t('fridge.form.name')}</span>
                 <input
                   value={formState.name}
                   onChange={(event) => updateFormField('name', event.target.value)}
-                  placeholder="例: 小松菜"
+                  placeholder={t('fridge.form.namePlaceholder')}
                 />
               </label>
               <label>
-                <span>カテゴリ</span>
+                <span>{t('fridge.form.category')}</span>
                 <input
                   value={formState.category}
                   onChange={(event) =>
                     updateFormField('category', event.target.value)
                   }
-                  placeholder="例: 野菜"
+                  placeholder={t('fridge.form.categoryPlaceholder')}
                 />
               </label>
               <label>
-                <span>個数</span>
+                <span>{t('fridge.form.quantity')}</span>
                 <input
                   type="number"
                   min="0"
@@ -500,7 +515,7 @@ export function FridgePage({
                 />
               </label>
               <label>
-                <span>g/ml</span>
+                <span>{t('fridge.form.gram')}</span>
                 <input
                   type="number"
                   min="0"
@@ -509,7 +524,7 @@ export function FridgePage({
                 />
               </label>
               <label>
-                <span>消費期限</span>
+                <span>{t('fridge.form.expiration')}</span>
                 <input
                   type="date"
                   value={formState.expirationDate}
@@ -519,11 +534,11 @@ export function FridgePage({
                 />
               </label>
               <label>
-                <span>メモ</span>
+                <span>{t('fridge.form.memo')}</span>
                 <input
                   value={formState.memo}
                   onChange={(event) => updateFormField('memo', event.target.value)}
-                  placeholder="例: レシート登録"
+                  placeholder={t('fridge.form.memoPlaceholder')}
                 />
               </label>
             </div>
@@ -541,10 +556,10 @@ export function FridgePage({
                 onClick={closeForm}
                 disabled={isSaving}
               >
-                キャンセル
+                {t('common.cancel')}
               </button>
               <button type="submit" className="primary-button" disabled={isSaving}>
-                {isSaving ? '保存中...' : '保存'}
+                {isSaving ? t('common.saving') : t('common.save')}
               </button>
             </div>
           </form>

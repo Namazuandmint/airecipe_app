@@ -88,3 +88,13 @@ export type ReceiptIngredientCandidate = {
   selected: boolean
   sourceLine?: string | null
 }
+
+export type UserPreferences = {
+  defaultServings: number
+  avoidedIngredients: string
+  notifications: {
+    expiration: boolean
+    lowStock: boolean
+    expirationLeadDays: number
+  }
+}

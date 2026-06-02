@@ -1,4 +1,5 @@
 import type { Ingredient, Recipe } from '../types/ui'
+import type { LanguageCode } from './i18n'
 
 type ApiResponse<T> =
   | ({ ok: true } & T)
@@ -36,8 +37,17 @@ async function readJson<T>(response: Response): Promise<T> {
   return payload as T
 }
 
-export async function fetchInventory() {
-  const response = await fetch('/api/inventory', {
+function withLanguage(path: string, language?: LanguageCode) {
+  if (!language) {
+    return path
+  }
+
+  const params = new URLSearchParams({ language })
+  return `${path}?${params.toString()}`
+}
+
+export async function fetchInventory(language?: LanguageCode) {
+  const response = await fetch(withLanguage('/api/inventory', language), {
     credentials: 'same-origin',
   })
   return readJson<{
@@ -104,7 +114,11 @@ export async function deleteInventoryItem(inventoryId: number) {
   }>(response)
 }
 
-export async function generateRecipes(servings = 2) {
+export async function generateRecipes(
+  servings = 2,
+  language?: LanguageCode,
+  avoidedIngredients?: string,
+) {
   const response = await fetch('/api/recipes/generate', {
     method: 'POST',
     credentials: 'same-origin',
@@ -113,6 +127,8 @@ export async function generateRecipes(servings = 2) {
     },
     body: JSON.stringify({
       servings,
+      language,
+      avoidedIngredients,
     }),
   })
 
@@ -122,7 +138,11 @@ export async function generateRecipes(servings = 2) {
   }>(response)
 }
 
-export async function markRecipeCooked(recipeId: string, servings: number) {
+export async function markRecipeCooked(
+  recipeId: string,
+  servings: number,
+  language?: LanguageCode,
+) {
   const response = await fetch('/api/recipes/cooked', {
     method: 'POST',
     credentials: 'same-origin',
@@ -132,6 +152,7 @@ export async function markRecipeCooked(recipeId: string, servings: number) {
     body: JSON.stringify({
       recipeId,
       servings,
+      language,
     }),
   })
 
@@ -143,8 +164,8 @@ export async function markRecipeCooked(recipeId: string, servings: number) {
   }>(response)
 }
 
-export async function fetchCookingHistory() {
-  const response = await fetch('/api/cooking-history', {
+export async function fetchCookingHistory(language?: LanguageCode) {
+  const response = await fetch(withLanguage('/api/cooking-history', language), {
     cache: 'no-store',
     credentials: 'same-origin',
   })
@@ -154,8 +175,8 @@ export async function fetchCookingHistory() {
   }>(response)
 }
 
-export async function fetchSavedRecipes() {
-  const response = await fetch('/api/recipes/saved', {
+export async function fetchSavedRecipes(language?: LanguageCode) {
+  const response = await fetch(withLanguage('/api/recipes/saved', language), {
     cache: 'no-store',
     credentials: 'same-origin',
   })
