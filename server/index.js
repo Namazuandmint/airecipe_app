@@ -18,12 +18,15 @@ import {
   signUpWithPassword,
 } from './auth.js'
 import {
+  createInventoryItemForUser,
+  deleteInventoryItemForUser,
   generateAndSaveRecipes,
   getCookingHistoryForUser,
   getInventoryForUser,
   getSavedRecipesForUser,
   markRecipeCooked,
   setRecipeFavorite,
+  updateInventoryItemForUser,
 } from './recipes.js'
 import {
   fallbackParseReceiptText,
@@ -230,7 +233,7 @@ export async function handleApiRequest(request, response) {
     response.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Headers': 'content-type',
-      'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+      'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
       'Access-Control-Allow-Credentials': 'true',
     })
     response.end()
@@ -311,6 +314,21 @@ export async function handleApiRequest(request, response) {
 
   if (request.method === 'GET' && url.pathname === '/api/inventory') {
     await handleInventory(authUser.id, response)
+    return
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/inventory') {
+    await handleInventoryCreate(request, response, authUser.id)
+    return
+  }
+
+  if (request.method === 'PATCH' && url.pathname === '/api/inventory') {
+    await handleInventoryUpdate(request, response, authUser.id)
+    return
+  }
+
+  if (request.method === 'DELETE' && url.pathname === '/api/inventory') {
+    await handleInventoryDelete(request, response, authUser.id)
     return
   }
 
@@ -771,6 +789,70 @@ async function handleInventory(userId, response) {
       ok: false,
       message:
         error instanceof Error ? error.message : 'Inventory request failed',
+    })
+  }
+}
+
+async function handleInventoryCreate(request, response, userId) {
+  try {
+    const body = await readJsonBody(request)
+    const result = await createInventoryItemForUser({
+      userId,
+      item: body,
+    })
+
+    sendJson(response, 200, {
+      ok: true,
+      ...result,
+    })
+  } catch (error) {
+    sendJson(response, 500, {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : 'Inventory create failed',
+    })
+  }
+}
+
+async function handleInventoryUpdate(request, response, userId) {
+  try {
+    const body = await readJsonBody(request)
+    const result = await updateInventoryItemForUser({
+      userId,
+      inventoryId: body?.inventoryId,
+      item: body,
+    })
+
+    sendJson(response, 200, {
+      ok: true,
+      ...result,
+    })
+  } catch (error) {
+    sendJson(response, 500, {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : 'Inventory update failed',
+    })
+  }
+}
+
+async function handleInventoryDelete(request, response, userId) {
+  try {
+    const body = await readJsonBody(request)
+    const result = await deleteInventoryItemForUser({
+      userId,
+      inventoryId: body?.inventoryId,
+    })
+
+    sendJson(response, 200, {
+      ok: true,
+      ...result,
+    })
+  } catch (error) {
+    sendJson(response, 500, {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : 'Inventory delete failed',
     })
   }
 }

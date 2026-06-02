@@ -46,6 +46,64 @@ export async function fetchInventory() {
   }>(response)
 }
 
+export type InventoryMutationInput = {
+  inventoryId?: number
+  name: string
+  category?: string | null
+  quantity?: number | null
+  gram?: number | null
+  expirationDate?: string | null
+  memo?: string | null
+}
+
+export async function createInventoryItem(item: InventoryMutationInput) {
+  const response = await fetch('/api/inventory', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(item),
+  })
+
+  return readJson<{
+    userId: string
+    inventory: Ingredient[]
+  }>(response)
+}
+
+export async function updateInventoryItem(item: InventoryMutationInput) {
+  const response = await fetch('/api/inventory', {
+    method: 'PATCH',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(item),
+  })
+
+  return readJson<{
+    userId: string
+    inventory: Ingredient[]
+  }>(response)
+}
+
+export async function deleteInventoryItem(inventoryId: number) {
+  const response = await fetch('/api/inventory', {
+    method: 'DELETE',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ inventoryId }),
+  })
+
+  return readJson<{
+    userId: string
+    inventory: Ingredient[]
+  }>(response)
+}
+
 export async function generateRecipes(servings = 2) {
   const response = await fetch('/api/recipes/generate', {
     method: 'POST',

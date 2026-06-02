@@ -88,6 +88,89 @@ function mapInventoryRows(rows) {
   })
 }
 
+function sanitizeText(value, fallback = '') {
+  const text = typeof value === 'string' ? value.trim() : ''
+
+  return text || fallback
+}
+
+function sanitizeOptionalDate(value) {
+  if (typeof value !== 'string' || !value.trim()) {
+    return null
+  }
+
+  const date = new Date(`${value}T00:00:00`)
+
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+
+  return value
+}
+
+function sanitizeInventoryPayload(payload) {
+  const name = sanitizeText(payload?.name)
+
+  if (!name) {
+    throw new Error('食材名を入力してください')
+  }
+
+  const quantity = Number(payload?.quantity ?? 0)
+  const gram = Number(payload?.gram ?? 0)
+
+  return {
+    name,
+    category: sanitizeText(payload?.category, 'その他'),
+    quantity: Number.isFinite(quantity) && quantity > 0 ? Math.floor(quantity) : null,
+    gram: Number.isFinite(gram) && gram > 0 ? Math.floor(gram) : null,
+    expirationDate: sanitizeOptionalDate(payload?.expirationDate),
+    memo: sanitizeText(payload?.memo) || null,
+  }
+}
+
+async function findOrCreateIngredientForInventory({ client, userId, item }) {
+  const { data: existing, error: fetchError } = await client
+    .from('ingredient_management')
+    .select('ingredient_id, ingredient_name, category')
+    .eq('user_id', userId)
+    .eq('ingredient_name', item.name)
+    .limit(1)
+    .maybeSingle()
+
+  if (fetchError) {
+    throw new Error(`Failed to find ingredient: ${fetchError.message}`)
+  }
+
+  if (existing) {
+    if ((existing.category ?? '') !== item.category) {
+      await client
+        .from('ingredient_management')
+        .update({ category: item.category })
+        .eq('user_id', userId)
+        .eq('ingredient_id', existing.ingredient_id)
+    }
+
+    return existing
+  }
+
+  const { data, error } = await client
+    .from('ingredient_management')
+    .insert({
+      user_id: userId,
+      ingredient_name: item.name,
+      category: item.category,
+      barcode: `manual-${Date.now()}`,
+    })
+    .select('ingredient_id, ingredient_name, category')
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to create ingredient: ${error.message}`)
+  }
+
+  return data
+}
+
 export async function getInventoryForUser(requestedUserId) {
   const userId = await resolveUserId(requestedUserId)
   const client = ensureSupabase()
@@ -122,6 +205,97 @@ export async function getInventoryForUser(requestedUserId) {
     userId,
     inventory: mapInventoryRows(data ?? []),
   }
+}
+
+export async function createInventoryItemForUser({ userId: requestedUserId, item }) {
+  const userId = await resolveUserId(requestedUserId)
+  const client = ensureSupabase()
+  const nextItem = sanitizeInventoryPayload(item)
+  const ingredient = await findOrCreateIngredientForInventory({
+    client,
+    userId,
+    item: nextItem,
+  })
+
+  const { error } = await client.from('inventory').insert({
+    ingredient_id: ingredient.ingredient_id,
+    user_id: userId,
+    quantity: nextItem.quantity,
+    gram: nextItem.gram,
+    purchase_date: new Date().toISOString().split('T')[0],
+    expiration_date: nextItem.expirationDate,
+    memo: nextItem.memo,
+  })
+
+  if (error) {
+    throw new Error(`Failed to create inventory: ${error.message}`)
+  }
+
+  return getInventoryForUser(userId)
+}
+
+export async function updateInventoryItemForUser({
+  userId: requestedUserId,
+  inventoryId,
+  item,
+}) {
+  const userId = await resolveUserId(requestedUserId)
+  const client = ensureSupabase()
+  const nextItem = sanitizeInventoryPayload(item)
+  const numericInventoryId = Number(inventoryId)
+
+  if (!Number.isFinite(numericInventoryId)) {
+    throw new Error('inventoryId is required')
+  }
+
+  const ingredient = await findOrCreateIngredientForInventory({
+    client,
+    userId,
+    item: nextItem,
+  })
+
+  const { error } = await client
+    .from('inventory')
+    .update({
+      ingredient_id: ingredient.ingredient_id,
+      quantity: nextItem.quantity,
+      gram: nextItem.gram,
+      expiration_date: nextItem.expirationDate,
+      memo: nextItem.memo,
+    })
+    .eq('user_id', userId)
+    .eq('inventory_id', numericInventoryId)
+
+  if (error) {
+    throw new Error(`Failed to update inventory: ${error.message}`)
+  }
+
+  return getInventoryForUser(userId)
+}
+
+export async function deleteInventoryItemForUser({
+  userId: requestedUserId,
+  inventoryId,
+}) {
+  const userId = await resolveUserId(requestedUserId)
+  const client = ensureSupabase()
+  const numericInventoryId = Number(inventoryId)
+
+  if (!Number.isFinite(numericInventoryId)) {
+    throw new Error('inventoryId is required')
+  }
+
+  const { error } = await client
+    .from('inventory')
+    .delete()
+    .eq('user_id', userId)
+    .eq('inventory_id', numericInventoryId)
+
+  if (error) {
+    throw new Error(`Failed to delete inventory: ${error.message}`)
+  }
+
+  return getInventoryForUser(userId)
 }
 
 function buildRecipePrompt(inventory, servings) {

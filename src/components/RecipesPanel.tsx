@@ -1,4 +1,5 @@
 import type { Recipe } from '../types/ui'
+import { useI18n } from '../lib/useI18n'
 
 type RecipesPanelProps = {
   recipes: Recipe[]
@@ -8,6 +9,20 @@ type RecipesPanelProps = {
   onCookRecipe?: (recipe: Recipe) => void
 }
 
+const visibleRecipeCount = 2
+
+function getRecipeTimestamp(recipe: Recipe) {
+  const value = recipe.createdAt ?? recipe.cookedAt
+
+  if (!value) {
+    return 0
+  }
+
+  const timestamp = new Date(value).getTime()
+
+  return Number.isNaN(timestamp) ? 0 : timestamp
+}
+
 export function RecipesPanel({
   recipes,
   isGenerating = false,
@@ -15,12 +30,17 @@ export function RecipesPanel({
   onSelectRecipe,
   onCookRecipe,
 }: RecipesPanelProps) {
+  const { t } = useI18n()
+  const visibleRecipes = recipes
+    .toSorted((left, right) => getRecipeTimestamp(right) - getRecipeTimestamp(left))
+    .slice(0, visibleRecipeCount)
+
   return (
     <section className="panel" id="recipes" aria-labelledby="recipes-title">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">レシピ候補</p>
-          <h2 id="recipes-title">在庫から作れる献立</h2>
+          <p className="eyebrow">{t('home.recipes.eyebrow')}</p>
+          <h2 id="recipes-title">{t('home.recipes.title')}</h2>
         </div>
         <button
           type="button"
@@ -28,13 +48,13 @@ export function RecipesPanel({
           onClick={onGenerateRecipe}
           disabled={isGenerating}
         >
-          {isGenerating ? '生成中...' : '再生成'}
+          {isGenerating ? t('home.hero.generating') : t('home.recipes.regenerate')}
         </button>
       </div>
 
       <div className="recipe-stack">
         {recipes.length ? (
-          recipes.map((recipe) => (
+          visibleRecipes.map((recipe) => (
             <article
               key={recipe.recipeId ?? recipe.name}
               className="recipe-card"
@@ -51,14 +71,14 @@ export function RecipesPanel({
                       onCookRecipe(recipe)
                     }}
                   >
-                    調理済み
+                    {t('home.recipes.cooked')}
                   </button>
                 ) : null}
               </div>
               <p>{recipe.meta}</p>
               {recipe.ingredients?.length ? (
                 <div className="recipe-amounts">
-                  <strong>1人前</strong>
+                  <strong>{t('home.recipes.serving')}</strong>
                   <ul>
                     {recipe.ingredients.map((ingredient) => (
                       <li key={ingredient.ingredientId}>
@@ -80,9 +100,7 @@ export function RecipesPanel({
             </article>
           ))
         ) : (
-          <p className="empty-state">
-            まだ作成したレシピがありません。食材を登録してからレシピを生成してください。
-          </p>
+          <p className="empty-state">{t('home.recipes.empty')}</p>
         )}
       </div>
     </section>

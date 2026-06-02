@@ -1,4 +1,25 @@
 import type { Ingredient } from '../types/ui'
+import { useI18n } from '../lib/useI18n'
+
+const visibleExpirationDays = 7
+
+function getDaysUntilExpiration(ingredient: Ingredient) {
+  if (!ingredient.expirationDate) {
+    return null
+  }
+
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const expiration = new Date(`${ingredient.expirationDate}T00:00:00`)
+
+  if (Number.isNaN(expiration.getTime())) {
+    return null
+  }
+
+  return Math.ceil(
+    (expiration.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+  )
+}
 
 export function IngredientsPanel({
   ingredients,
@@ -7,21 +28,39 @@ export function IngredientsPanel({
   ingredients: Ingredient[]
   onAddIngredient?: () => void
 }) {
+  const { t } = useI18n()
+  const visibleIngredients = ingredients
+    .filter((ingredient) => {
+      const daysUntilExpiration = getDaysUntilExpiration(ingredient)
+
+      return (
+        daysUntilExpiration !== null &&
+        daysUntilExpiration >= 0 &&
+        daysUntilExpiration <= visibleExpirationDays
+      )
+    })
+    .toSorted((left, right) => {
+      const leftDays = getDaysUntilExpiration(left) ?? Number.MAX_SAFE_INTEGER
+      const rightDays = getDaysUntilExpiration(right) ?? Number.MAX_SAFE_INTEGER
+
+      return leftDays - rightDays
+    })
+
   return (
     <section className="panel" id="ingredients" aria-labelledby="ingredients-title">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">在庫管理</p>
-          <h2 id="ingredients-title">登録済みの食材</h2>
+          <p className="eyebrow">{t('home.ingredients.eyebrow')}</p>
+          <h2 id="ingredients-title">{t('home.ingredients.title')}</h2>
         </div>
         <button type="button" className="small-button" onClick={onAddIngredient}>
-          登録
+          {t('home.ingredients.add')}
         </button>
       </div>
 
-      {ingredients.length ? (
+      {visibleIngredients.length ? (
         <ul className="ingredient-list">
-          {ingredients.map((ingredient) => (
+          {visibleIngredients.map((ingredient) => (
             <li key={ingredient.inventoryId ?? ingredient.name}>
               <span>
                 <strong>{ingredient.name}</strong>
@@ -32,9 +71,7 @@ export function IngredientsPanel({
           ))}
         </ul>
       ) : (
-        <p className="empty-state">
-          食材がまだ登録されていません。レシート登録から食材を追加してください。
-        </p>
+        <p className="empty-state">{t('home.ingredients.empty')}</p>
       )}
     </section>
   )

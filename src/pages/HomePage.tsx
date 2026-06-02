@@ -5,7 +5,9 @@ import { IngredientsPanel } from '../components/IngredientsPanel'
 import { RecipesPanel } from '../components/RecipesPanel'
 import { SummaryGrid } from '../components/SummaryGrid'
 import { Topbar } from '../components/Topbar'
-import { primaryFeatures, secondaryFeatures } from '../data/home'
+import { getSecondaryFeatures } from '../data/home'
+import type { TranslateFn } from '../lib/i18n'
+import { useI18n } from '../lib/useI18n'
 import {
   fetchInventory,
   fetchSavedRecipes,
@@ -40,35 +42,41 @@ function isNearExpiration(ingredient: Ingredient) {
   return diffDays >= 0 && diffDays <= 3
 }
 
-function buildSummaryItems(ingredients: Ingredient[], recipes: Recipe[]) {
+function buildSummaryItems(
+  ingredients: Ingredient[],
+  recipes: Recipe[],
+  t: TranslateFn,
+) {
   const nearExpirationCount = ingredients.filter(isNearExpiration).length
   const favoriteCount = recipes.filter((recipe) => recipe.isFavorite).length
 
   return [
     {
-      label: '登録食材',
+      label: t('home.summary.ingredientsLabel'),
       value: String(ingredients.length),
       note: ingredients.length
-        ? 'ログイン中のユーザーの在庫'
-        : 'まず食材を登録してください',
+        ? t('home.summary.ingredientsNote')
+        : t('home.summary.ingredientsEmptyNote'),
     },
     {
-      label: '期限間近',
+      label: t('home.summary.nearExpirationLabel'),
       value: String(nearExpirationCount),
       note:
         nearExpirationCount > 0
-          ? '3日以内に期限が近い食材'
-          : '期限が近い食材はありません',
+          ? t('home.summary.nearExpirationNote')
+          : t('home.summary.nearExpirationEmptyNote'),
     },
     {
-      label: 'レシピ候補',
+      label: t('home.summary.recipesLabel'),
       value: String(recipes.length),
-      note: recipes.length ? '保存済みのレシピ' : 'まだ生成されていません',
+      note: recipes.length
+        ? t('home.summary.recipesNote')
+        : t('home.summary.recipesEmptyNote'),
     },
     {
-      label: 'お気に入り',
+      label: t('home.summary.favoritesLabel'),
       value: String(favoriteCount),
-      note: '保存済みレシピから集計',
+      note: t('home.summary.favoritesNote'),
     },
   ]
 }
@@ -78,6 +86,7 @@ export function HomePage({
   onSelectRecipe,
   onLogout,
 }: HomePageProps) {
+  const { t } = useI18n()
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
@@ -85,9 +94,10 @@ export function HomePage({
   const [statusMessage, setStatusMessage] = useState('')
   const [cookingRecipe, setCookingRecipe] = useState<Recipe | null>(null)
   const [servings, setServings] = useState(1)
+  const secondaryFeatures = useMemo(() => getSecondaryFeatures(t), [t])
   const currentSummaryItems = useMemo(
-    () => buildSummaryItems(ingredients, recipes),
-    [ingredients, recipes],
+    () => buildSummaryItems(ingredients, recipes, t),
+    [ingredients, recipes, t],
   )
 
   useEffect(() => {
@@ -103,7 +113,9 @@ export function HomePage({
         console.warn('[vite] Inventory fetch failed:', error)
         if (isMounted) {
           setStatusMessage(
-            error instanceof Error ? error.message : '食材の取得に失敗しました',
+            error instanceof Error
+              ? error.message
+              : t('home.status.inventoryFetchFailed'),
           )
         }
       })
@@ -121,17 +133,19 @@ export function HomePage({
     return () => {
       isMounted = false
     }
-  }, [])
+  }, [t])
 
   function navigateToReceipt() {
     onNavigate?.('receipt')
   }
 
+  function navigateToFridge() {
+    onNavigate?.('fridge')
+  }
+
   async function handleGenerateRecipe() {
     if (!ingredients.length) {
-      setStatusMessage(
-        '食材を登録してからレシピを生成してください。レシート登録から食材を追加できます。',
-      )
+      setStatusMessage(t('home.status.generateEmpty'))
       return
     }
 
@@ -143,12 +157,12 @@ export function HomePage({
 
       if (result.recipes.length) {
         setRecipes(result.recipes)
-        setStatusMessage('レシピ候補を生成しました')
+        setStatusMessage(t('home.status.generateSuccess'))
       }
     } catch (error) {
       console.error('[vite] Recipe generation failed:', error)
       setStatusMessage(
-        error instanceof Error ? error.message : 'レシピ生成に失敗しました',
+        error instanceof Error ? error.message : t('home.status.generateFailed'),
       )
     } finally {
       setIsGenerating(false)
@@ -172,12 +186,14 @@ export function HomePage({
     try {
       const result = await markRecipeCooked(cookingRecipe.recipeId, servings)
       setIngredients(result.inventory)
-      setStatusMessage(`${servings}人前として在庫を更新しました`)
+      setStatusMessage(t('home.status.cookingUpdated', { servings }))
       setCookingRecipe(null)
     } catch (error) {
       console.error('[vite] Cooking update failed:', error)
       setStatusMessage(
-        error instanceof Error ? error.message : '在庫の更新に失敗しました',
+        error instanceof Error
+          ? error.message
+          : t('home.status.inventoryUpdateFailed'),
       )
     } finally {
       setIsCooking(false)
@@ -192,7 +208,7 @@ export function HomePage({
         <HeroPanel
           isGenerating={isGenerating}
           onGenerateRecipe={handleGenerateRecipe}
-          onAddIngredient={navigateToReceipt}
+          onAddIngredient={navigateToFridge}
           onScanReceipt={navigateToReceipt}
           onShowRecipes={() => onNavigate?.('history')}
         />
@@ -204,26 +220,6 @@ export function HomePage({
         ) : null}
 
         <SummaryGrid items={currentSummaryItems} />
-
-        <section className="feature-section" aria-label="クイックアクセス">
-          <div className="feature-grid">
-            {primaryFeatures.map((feature, index) => (
-              <FeatureCard
-                key={feature.title}
-                feature={feature}
-                onAction={
-                  index === 0
-                    ? handleGenerateRecipe
-                    : index === 1
-                      ? navigateToReceipt
-                      : index === 3
-                        ? () => onNavigate?.('history')
-                        : undefined
-                }
-              />
-            ))}
-          </div>
-        </section>
 
         <div className="dashboard-grid">
           <IngredientsPanel
@@ -242,11 +238,19 @@ export function HomePage({
         <section
           className="secondary-section"
           id="shopping"
-          aria-label="アカウントとサポート"
+          aria-label={t('home.secondaryLabel')}
         >
           <div className="secondary-grid">
             {secondaryFeatures.map((feature) => (
-              <FeatureCard key={feature.title} feature={feature} />
+              <FeatureCard
+                key={feature.title}
+                feature={feature}
+                onAction={
+                  feature.icon === 'settings'
+                    ? () => onNavigate?.('settings')
+                    : undefined
+                }
+              />
             ))}
           </div>
         </section>
@@ -260,10 +264,10 @@ export function HomePage({
             aria-modal="true"
             role="dialog"
           >
-            <p className="eyebrow">調理済み</p>
+            <p className="eyebrow">{t('home.modal.cooked')}</p>
             <h2 id="cook-modal-title">{cookingRecipe.name}</h2>
             <label className="serving-field">
-              <span>何人前作りましたか</span>
+              <span>{t('home.modal.servingsQuestion')}</span>
               <input
                 type="number"
                 min="1"
@@ -281,7 +285,7 @@ export function HomePage({
                 onClick={() => setCookingRecipe(null)}
                 disabled={isCooking}
               >
-                キャンセル
+                {t('home.modal.cancel')}
               </button>
               <button
                 type="button"
@@ -289,7 +293,9 @@ export function HomePage({
                 onClick={handleConfirmCooked}
                 disabled={isCooking}
               >
-                {isCooking ? '更新中...' : '在庫を減らす'}
+                {isCooking
+                  ? t('home.modal.updating')
+                  : t('home.modal.reduceInventory')}
               </button>
             </div>
           </section>

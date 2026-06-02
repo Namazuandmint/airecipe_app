@@ -1,4 +1,5 @@
 import { Icon } from './Icon'
+import { useI18n } from '../lib/useI18n'
 import type { AppDestination } from '../types/ui'
 
 type TopbarProps = {
@@ -6,13 +7,15 @@ type TopbarProps = {
   onLogout?: () => void | Promise<void>
 }
 
-export function Topbar({ onNavigate, onLogout }: TopbarProps) {
+export function Topbar({ onNavigate }: TopbarProps) {
+  const { t } = useI18n()
+
   return (
     <header className="topbar">
       <a
         className="brand"
         href="/"
-        aria-label="あいくっくホーム"
+        aria-label={t('app.name')}
         onClick={(event) => {
           event.preventDefault()
           onNavigate?.('home')
@@ -22,12 +25,12 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
           <img src="/app-icon.png" alt="" />
         </span>
         <span>
-          <strong>あいくっく</strong>
-          <small>食材管理と献立づくり</small>
+          <strong>{t('app.name')}</strong>
+          <small>{t('app.tagline')}</small>
         </span>
       </a>
 
-      <nav className="topbar__nav" aria-label="メインメニュー">
+      <nav className="topbar__nav" aria-label={t('topbar.menuLabel')}>
         <a
           href="#ingredients"
           onClick={(event) => {
@@ -35,7 +38,7 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
             onNavigate?.('fridge')
           }}
         >
-          食材
+          {t('topbar.ingredients')}
         </a>
         <a
           href="#recipes"
@@ -49,7 +52,7 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
             }, 100)
           }}
         >
-          レシピ
+          {t('topbar.recipes')}
         </a>
         <a
           href="#receipt"
@@ -58,7 +61,7 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
             onNavigate?.('receipt')
           }}
         >
-          レシート
+          {t('topbar.receipt')}
         </a>
         <a
           href="#history"
@@ -67,28 +70,25 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
             onNavigate?.('history')
           }}
         >
-          履歴
+          {t('topbar.history')}
         </a>
       </nav>
 
       <div className="topbar__actions">
-        <button type="button" className="icon-button" aria-label="通知">
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={t('topbar.notifications')}
+        >
           <Icon name="bell" />
         </button>
         <button
           type="button"
           className="account-button"
-          onClick={() => {
-            if (onLogout) {
-              void onLogout()
-              return
-            }
-
-            onNavigate?.('login')
-          }}
+          onClick={() => onNavigate?.('settings')}
         >
-          <Icon name="user" />
-          <span>{onLogout ? 'ログアウト' : 'アカウント'}</span>
+          <Icon name="settings" />
+          <span>{t('topbar.settings')}</span>
         </button>
       </div>
     </header>

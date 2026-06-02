@@ -8,6 +8,7 @@ import { RecipeDetailPage } from './pages/RecipeDetailPage'
 import { CookingHistoryPage } from './pages/CookingHistoryPage'
 import { ReceiptScanPage } from './pages/ReceiptScanPage'
 import { GeminiTestPage } from './pages/GeminiTestPage'
+import { SettingsPage } from './pages/SettingsPage'
 import LoginScreen from './pages/LoginScreen'
 import {
   createSessionFromOAuthTokens,
@@ -31,6 +32,10 @@ function getPageFromPath(): AppDestination {
 
   if (window.location.pathname === '/login') {
     return 'login'
+  }
+
+  if (window.location.pathname === '/settings') {
+    return 'settings'
   }
 
   return 'home'
@@ -175,9 +180,13 @@ function App() {
 
     if (page === 'test') {
       pushPath('/test')
+    } else if (page === 'settings') {
+      pushPath('/settings')
     } else if (page === 'login') {
       pushPath('/login')
     } else if (window.location.pathname === '/test') {
+      pushPath('/')
+    } else if (window.location.pathname === '/settings') {
       pushPath('/')
     } else if (window.location.pathname === '/login') {
       pushPath('/')
@@ -241,6 +250,16 @@ function App() {
 
   if (currentPage === 'test') {
     return <GeminiTestPage onNavigate={handleNavigate} onLogout={handleLogout} />
+  }
+
+  if (currentPage === 'settings') {
+    return (
+      <SettingsPage
+        user={currentUser}
+        onNavigate={handleNavigate}
+        onLogout={handleLogout}
+      />
+    )
   }
 
   if (currentPage === 'login') {

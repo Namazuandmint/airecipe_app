@@ -34,6 +34,7 @@ export type AppDestination =
   | 'history'
   | 'receipt'
   | 'test'
+  | 'settings'
   | 'login'
 
 export type Ingredient = {
