@@ -11,6 +11,7 @@ import { GeminiTestPage } from './pages/GeminiTestPage'
 import { ReceiptDetailRegisterPage } from './pages/ReceiptDetailRegisterPage'
 import { SettingsPage } from './pages/SettingsPage'
 import LoginScreen from './pages/LoginScreen'
+import RegisterPage from './pages/RegisterPage'
 import {
   createSessionFromOAuthTokens,
   getCurrentUser,
@@ -46,6 +47,10 @@ function getPageFromPath(): AppDestination {
 
   if (window.location.pathname === '/login') {
     return 'login'
+  }
+
+  if (window.location.pathname === '/register') {
+    return 'register'
   }
 
   if (window.location.pathname === '/settings') {
@@ -171,7 +176,10 @@ function App() {
         setCurrentUser(result.user)
         setPasswordResetTokens(null)
 
-        if (window.location.pathname === '/login') {
+        if (
+          window.location.pathname === '/login' ||
+          window.location.pathname === '/register'
+        ) {
           replacePath('/')
           setCurrentPage('home')
         }
@@ -181,8 +189,13 @@ function App() {
         }
 
         setCurrentUser(null)
-        replacePath('/login')
-        setCurrentPage('login')
+        if (window.location.pathname === '/register') {
+          replacePath('/register')
+          setCurrentPage('register')
+        } else {
+          replacePath('/login')
+          setCurrentPage('login')
+        }
       } finally {
         if (isMounted) {
           setIsAuthLoading(false)
@@ -201,7 +214,7 @@ function App() {
     function handlePopState() {
       const nextPage = getPageFromPath()
 
-      if (!currentUser && nextPage !== 'login') {
+      if (!currentUser && nextPage !== 'login' && nextPage !== 'register') {
         replacePath('/login')
         setCurrentPage('login')
         return
@@ -216,7 +229,7 @@ function App() {
   }, [currentUser])
 
   function handleNavigate(page: AppDestination) {
-    if (!currentUser && page !== 'login') {
+    if (!currentUser && page !== 'login' && page !== 'register') {
       pushPath('/login')
       setCurrentPage('login')
       return
@@ -261,10 +274,18 @@ function App() {
   }
 
   if (!currentUser) {
+    if (currentPage === 'register') {
+      return <RegisterPage onAuthenticated={handleAuthenticated} />
+    }
+
     return (
       <LoginScreen
         passwordResetTokens={passwordResetTokens}
         onAuthenticated={handleAuthenticated}
+        onNavigateToRegister={() => {
+          pushPath('/register')
+          setCurrentPage('register')
+        }}
       />
     )
   }

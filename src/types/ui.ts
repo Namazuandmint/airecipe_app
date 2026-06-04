@@ -35,6 +35,7 @@ export type AppDestination =
   | 'receipt'
   | 'test'
   | 'settings'
+  | 'register'
   | 'login'
   | 'receipt-detail'
 
