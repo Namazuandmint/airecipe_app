@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Icon } from './Icon'
 import { useI18n } from '../lib/useI18n'
 import { fetchInventory } from '../lib/recipeApi'
@@ -67,8 +67,9 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences)
+  const notificationRef = useRef<HTMLDivElement | null>(null)
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     fetchInventory(language)
       .then((result) => {
         setIngredients(result.inventory)
@@ -84,7 +85,7 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
       .catch((err) => {
         console.warn('[Topbar] Failed to fetch preferences:', err)
       })
-  }
+  }, [language])
 
   useEffect(() => {
     loadData()
@@ -96,7 +97,40 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
     return () => {
       window.removeEventListener('inventory-updated', handleInventoryUpdated)
     }
-  }, [language])
+  }, [loadData])
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+
+      if (
+        target instanceof Node &&
+        notificationRef.current?.contains(target)
+      ) {
+        return
+      }
+
+      setIsOpen(false)
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown, true)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
 
   const expiringIngredients = useMemo(() => {
     const leadDays = preferences.notifications.expiration
@@ -206,12 +240,17 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
       </nav>
 
       <div className="topbar__actions">
-        <div className="notification-trigger-container" style={{ position: 'relative' }}>
+        <div
+          ref={notificationRef}
+          className="notification-trigger-container"
+          style={{ position: 'relative' }}
+        >
           <button
             type="button"
             className="icon-button"
             aria-label={t('topbar.notifications')}
-            onClick={() => setIsOpen(!isOpen)}
+            aria-expanded={isOpen}
+            onClick={() => setIsOpen((current) => !current)}
           >
             <Icon name="bell" />
             {nearExpirationCount > 0 && (
@@ -220,55 +259,43 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
           </button>
 
           {isOpen && (
-            <>
-              <div
-                className="dropdown-overlay"
-                style={{
-                  position: 'fixed',
-                  inset: 0,
-                  zIndex: 40,
-                  backgroundColor: 'transparent',
-                }}
-                onClick={() => setIsOpen(false)}
-              />
-              <div className="notifications-dropdown" style={{ zIndex: 50 }}>
-                <div className="notifications-header">
-                  <h4>{t('notification.title')}</h4>
-                </div>
-                <div className="notifications-list">
-                  {expiringIngredients.length === 0 ? (
-                    <div className="notifications-empty">
-                      {t('notification.none')}
-                    </div>
-                  ) : (
-                    expiringIngredients.map(({ item, days, date }) => (
-                      <button
-                        key={item.inventoryId ?? item.name}
-                        type="button"
-                        className="notification-item"
-                        onClick={() => {
-                          onNavigate?.('fridge')
-                          setIsOpen(false)
-                        }}
-                      >
-                        <div className="notification-item__icon">
-                          <Icon name="bell" />
-                        </div>
-                        <div className="notification-item__content">
-                          <p className="notification-item__title">{item.name}</p>
-                          <p className="notification-item__desc">
-                            {t('notification.expiring', { name: item.name })}
-                          </p>
-                          <span className={`notification-item__days ${getDaysClass(days)}`}>
-                            {getDaysText(days)} ({date})
-                          </span>
-                        </div>
-                      </button>
-                    ))
-                  )}
-                </div>
+            <div className="notifications-dropdown">
+              <div className="notifications-header">
+                <h4>{t('notification.title')}</h4>
               </div>
-            </>
+              <div className="notifications-list">
+                {expiringIngredients.length === 0 ? (
+                  <div className="notifications-empty">
+                    {t('notification.none')}
+                  </div>
+                ) : (
+                  expiringIngredients.map(({ item, days, date }) => (
+                    <button
+                      key={item.inventoryId ?? item.name}
+                      type="button"
+                      className="notification-item"
+                      onClick={() => {
+                        onNavigate?.('fridge')
+                        setIsOpen(false)
+                      }}
+                    >
+                      <div className="notification-item__icon">
+                        <Icon name="bell" />
+                      </div>
+                      <div className="notification-item__content">
+                        <p className="notification-item__title">{item.name}</p>
+                        <p className="notification-item__desc">
+                          {t('notification.expiring', { name: item.name })}
+                        </p>
+                        <span className={`notification-item__days ${getDaysClass(days)}`}>
+                          {getDaysText(days)} ({date})
+                        </span>
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
           )}
         </div>
 
@@ -294,4 +321,3 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
     </header>
   )
 }
-
