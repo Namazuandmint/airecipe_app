@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Icon } from '../components/Icon'
-import { Topbar } from '../components/Topbar'
 import {
   fetchAdminContactMessages,
   type ContactMessage,
@@ -34,7 +33,6 @@ function formatDateTime(value: string) {
 export function AdminConsolePage({
   user,
   onNavigate,
-  onLogout,
 }: AdminConsolePageProps) {
   const { t } = useI18n()
   const [messages, setMessages] = useState<ContactMessage[]>([])
@@ -52,6 +50,7 @@ export function AdminConsolePage({
       .then((result) => {
         if (isMounted) {
           setMessages(result.contactMessages)
+          setIsLoading(false)
         }
       })
       .catch((error) => {
@@ -60,10 +59,6 @@ export function AdminConsolePage({
           setErrorMessage(
             error instanceof Error ? error.message : t('admin.fetchFailed'),
           )
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
           setIsLoading(false)
         }
       })
@@ -74,9 +69,7 @@ export function AdminConsolePage({
   }, [t, user.isAdmin])
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="settings-page admin-page">
         <div className="fridge-header">
           <div>
@@ -155,6 +148,6 @@ export function AdminConsolePage({
           </section>
         )}
       </main>
-    </div>
+    </>
   )
 }

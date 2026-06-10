@@ -69,8 +69,9 @@ export async function generateRecipes(
   avoidedIngredients?: string,
   cookingRequest?: string,
   model?: 'gemini' | 'groq',
+  seasoningMode?: 'unlimited' | 'strict',
 ) {
-  return postJson<{
+  const result = await postJson<{
     userId: string
     recipes: Recipe[]
   }>('/api/recipes/generate', {
@@ -79,7 +80,10 @@ export async function generateRecipes(
     avoidedIngredients,
     cookingRequest,
     model,
+    seasoningMode,
   })
+  dispatchInventoryUpdated()
+  return result
 }
 
 export async function markRecipeCooked(
@@ -119,7 +123,7 @@ export async function setRecipeFavorite(
   recipeId: string,
   isFavorite: boolean,
 ) {
-  return postJson<{
+  const result = await postJson<{
     userId: string
     recipeId: string
     isFavorite: boolean
@@ -127,4 +131,6 @@ export async function setRecipeFavorite(
     recipeId,
     isFavorite,
   })
+  dispatchInventoryUpdated()
+  return result
 }

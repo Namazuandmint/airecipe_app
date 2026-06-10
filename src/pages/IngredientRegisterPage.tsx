@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { Icon } from '../components/Icon'
-import { Topbar } from '../components/Topbar'
 import { generateGeminiContent } from '../lib/geminiApi'
 import { useI18n } from '../lib/useI18n'
 import { ReceiptDetailRegisterPage } from './ReceiptDetailRegisterPage'
@@ -233,6 +232,7 @@ export function IngredientRegisterPage({
       setStatusMessage(
         t('ingredientRegister.recognizedCount', { count: items.length }),
       )
+      setIsRecognizing(false)
     } catch (error) {
       console.error('[vite] Food image recognition failed:', error)
       setErrorMessage(
@@ -241,7 +241,6 @@ export function IngredientRegisterPage({
           : t('ingredientRegister.failed'),
       )
       setStatusMessage('')
-    } finally {
       setIsRecognizing(false)
     }
   }
@@ -346,8 +345,7 @@ export function IngredientRegisterPage({
 
   if (detailItems.length) {
     return (
-      <div className="app-shell">
-        <Topbar onNavigate={onNavigate} onLogout={onLogout} />
+      <>
         <main className="ingredient-register-page ingredient-register-page--wide">
           <ReceiptDetailRegisterPage
             embedded
@@ -357,14 +355,12 @@ export function IngredientRegisterPage({
             onLogout={onLogout}
           />
         </main>
-      </div>
+      </>
     )
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="ingredient-register-page">
         <div className="fridge-header">
           <div>
@@ -586,6 +582,6 @@ export function IngredientRegisterPage({
           )}
         </section>
       </main>
-    </div>
+    </>
   )
 }

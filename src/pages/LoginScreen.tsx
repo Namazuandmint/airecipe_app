@@ -48,13 +48,13 @@ export default function LoginScreen({
         );
         setStatusMessage(t("login.passwordUpdateSuccess"));
         onAuthenticated?.(result.user);
+        setIsLoading(false);
       } catch (error) {
         setErrorMessage(
           error instanceof Error
             ? error.message
             : t("login.passwordUpdateFailed"),
         );
-      } finally {
         setIsLoading(false);
       }
       return;
@@ -69,11 +69,11 @@ export default function LoginScreen({
       const result = await loginWithPassword(email, password);
       setStatusMessage(t("login.success"));
       onAuthenticated?.(result.user);
+      setIsLoading(false);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : t("login.failed"),
       );
-    } finally {
       setIsLoading(false);
     }
   };
@@ -107,13 +107,13 @@ export default function LoginScreen({
     try {
       await sendPasswordResetEmail(email, window.location.origin);
       setStatusMessage(t("login.resetSent"));
+      setIsLoading(false);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
           ? error.message
           : t("login.resetFailed"),
       );
-    } finally {
       setIsLoading(false);
     }
   };

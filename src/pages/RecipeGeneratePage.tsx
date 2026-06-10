@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Icon } from '../components/Icon'
 import { RecipesPanel } from '../components/RecipesPanel'
-import { Topbar } from '../components/Topbar'
+import { getCache, setCache } from '../lib/dataCache'
 import {
   fetchInventory,
   fetchSavedRecipes,
@@ -38,7 +38,6 @@ function formatIngredientAmount(
 export function RecipeGeneratePage({
   onNavigate,
   onSelectRecipe,
-  onLogout,
 }: RecipeGeneratePageProps) {
   const { language, t } = useI18n()
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
@@ -58,9 +57,23 @@ export function RecipeGeneratePage({
 
   useEffect(() => {
     let isMounted = true
+    const cacheKey = `recipe-generate:${language}`
+
+    const cached = getCache<{
+      ingredients: Ingredient[]
+      recipes: Recipe[]
+      preferences: UserPreferences
+    }>(cacheKey)
+    if (cached) {
+      setIngredients(cached.ingredients)
+      setRecipes(cached.recipes)
+      setPreferences(cached.preferences)
+      setServings(cached.preferences.defaultServings)
+      setIsLoading(false)
+    }
 
     async function loadPageData() {
-      setIsLoading(true)
+      setIsLoading(!cached)
 
       try {
         const [inventoryResult, recipesResult, preferencesResult] =
@@ -74,10 +87,16 @@ export function RecipeGeneratePage({
           return
         }
 
+        setCache(cacheKey, {
+          ingredients: inventoryResult.inventory,
+          recipes: recipesResult.recipes,
+          preferences: preferencesResult.preferences,
+        })
         setIngredients(inventoryResult.inventory)
         setRecipes(recipesResult.recipes)
         setPreferences(preferencesResult.preferences)
         setServings(preferencesResult.preferences.defaultServings)
+        setIsLoading(false)
       } catch (error) {
         if (isMounted) {
           setStatusMessage(
@@ -85,9 +104,6 @@ export function RecipeGeneratePage({
               ? error.message
               : t('recipeGenerate.loadFailed'),
           )
-        }
-      } finally {
-        if (isMounted) {
           setIsLoading(false)
         }
       }
@@ -118,23 +134,22 @@ export function RecipeGeneratePage({
         preferences.avoidedIngredients,
         cookingRequest,
         preferences.recipeModel,
+        preferences.seasoningMode,
       )
 
       setRecipes(result.recipes)
       setStatusMessage(t('recipeGenerate.generateSuccess'))
+      setIsGenerating(false)
     } catch (error) {
       setStatusMessage(
         error instanceof Error ? error.message : t('recipeGenerate.generateFailed'),
       )
-    } finally {
       setIsGenerating(false)
     }
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="recipe-generate-page">
         <div className="fridge-header">
           <div>
@@ -159,8 +174,15 @@ export function RecipeGeneratePage({
           </p>
         ) : null}
 
-        <section className="recipe-generate-layout">
-          <form className="panel recipe-prompt-panel" onSubmit={handleGenerate}>
+        {isLoading ? (
+          <div className="fridge-loading">
+            <div className="loading-spinner" />
+            <p>{t('common.loading')}</p>
+          </div>
+        ) : (
+          <div className="content-appear">
+            <section className="recipe-generate-layout">
+              <form className="panel recipe-prompt-panel" onSubmit={handleGenerate}>
             <div className="section-heading">
               <div>
                 <p className="eyebrow">{t('recipeGenerate.conditionEyebrow')}</p>
@@ -249,7 +271,9 @@ export function RecipeGeneratePage({
           onGenerateRecipe={() => void handleGenerate()}
           onSelectRecipe={onSelectRecipe}
         />
+          </div>
+        )}
       </main>
-    </div>
+    </>
   )
 }

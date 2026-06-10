@@ -100,10 +100,13 @@ export type ReceiptIngredientCandidate = {
 
 export type RecipeModelChoice = 'gemini' | 'groq'
 
+export type SeasoningMode = 'unlimited' | 'strict'
+
 export type UserPreferences = {
   defaultServings: number
   avoidedIngredients: string
   recipeModel: RecipeModelChoice
+  seasoningMode: SeasoningMode
   notifications: {
     expiration: boolean
     lowStock: boolean

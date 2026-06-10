@@ -6,6 +6,7 @@ export const defaultUserPreferences = {
   defaultServings: 2,
   avoidedIngredients: '',
   recipeModel: 'groq',
+  seasoningMode: 'unlimited',
   notifications: {
     expiration: true,
     lowStock: false,
@@ -14,9 +15,14 @@ export const defaultUserPreferences = {
 }
 
 const allowedRecipeModels = new Set(['gemini', 'groq'])
+const allowedSeasoningModes = new Set(['unlimited', 'strict'])
 
 function sanitizeRecipeModel(value) {
   return allowedRecipeModels.has(value) ? value : defaultUserPreferences.recipeModel
+}
+
+function sanitizeSeasoningMode(value) {
+  return allowedSeasoningModes.has(value) ? value : defaultUserPreferences.seasoningMode
 }
 
 function ensureSupabaseAdmin() {
@@ -65,6 +71,7 @@ export function sanitizeUserPreferences(value) {
         ? source.avoidedIngredients.slice(0, 1000)
         : '',
     recipeModel: sanitizeRecipeModel(source.recipeModel),
+    seasoningMode: sanitizeSeasoningMode(source.seasoningMode),
     notifications: {
       expiration: notifications.expiration !== false,
       lowStock: notifications.lowStock === true,

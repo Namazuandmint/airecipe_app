@@ -3,6 +3,82 @@
   background: var(--app-bg);
 }
 
+.page-transition {
+  animation: pageFadeIn 0.22s ease-out;
+}
+
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100svh;
+  background: var(--app-bg);
+}
+
+.page-loading::after {
+  content: '';
+  width: 40px;
+  height: 40px;
+  border: 4px solid var(--line);
+  border-top-color: var(--ink);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.content-appear {
+  animation: contentFadeIn 0.32s ease both;
+}
+
+@keyframes contentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-stagger > * {
+  animation: contentFadeIn 0.32s ease both;
+}
+
+.card-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.card-stagger > *:nth-child(2) { animation-delay: 50ms; }
+.card-stagger > *:nth-child(3) { animation-delay: 100ms; }
+.card-stagger > *:nth-child(4) { animation-delay: 150ms; }
+.card-stagger > *:nth-child(5) { animation-delay: 200ms; }
+.card-stagger > *:nth-child(6) { animation-delay: 250ms; }
+.card-stagger > *:nth-child(7) { animation-delay: 300ms; }
+.card-stagger > *:nth-child(8) { animation-delay: 350ms; }
+
+.content-loading-pulse {
+  animation: skeletonPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+.content-loading-block {
+  background: var(--line);
+  border-radius: 6px;
+  min-height: 1em;
+}
+
 *,
 *::before,
 *::after {
@@ -437,7 +513,7 @@ button:disabled {
   flex-direction: column;
   justify-content: space-between;
   gap: 18px;
-  padding: 20px;
+  padding: 18px;
   border-radius: 8px;
 }
 
@@ -459,7 +535,7 @@ button:disabled {
 
 .feature-card p,
 .recipe-card p {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
   font-size: 14px;
 }
@@ -515,7 +591,7 @@ button:disabled {
 }
 
 .panel {
-  padding: 22px;
+  padding: 18px;
   border-radius: 8px;
 }
 
@@ -569,7 +645,7 @@ button:disabled {
 }
 
 .recipe-card {
-  padding: 16px;
+  padding: 18px;
   border-radius: 8px;
   cursor: pointer;
   transition:
@@ -1781,9 +1857,9 @@ button:disabled {
 }
 
 .fridge-summary .summary-card {
-  padding: 20px;
+  padding: 18px;
   border: 1px solid var(--line);
-  border-radius: 12px;
+  border-radius: 8px;
   background: #fff;
   box-shadow: var(--shadow-subtle);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
@@ -1803,7 +1879,7 @@ button:disabled {
 
 .fridge-summary .card-value {
   display: block;
-  margin: 10px 0 4px;
+  margin: 8px 0 2px;
   color: var(--ink);
   font-size: 36px;
   font-weight: 900;
@@ -1892,6 +1968,26 @@ button:disabled {
   overflow: hidden;
   background: #fff;
   box-shadow: var(--shadow-subtle);
+}
+
+.category-expand-toggle {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 16px;
+  background: var(--surface-soft);
+  border: none;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 12px 12px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.category-expand-toggle:hover {
+  background: var(--line);
 }
 
 .category-title {

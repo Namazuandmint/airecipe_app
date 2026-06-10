@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Topbar } from '../components/Topbar'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../lib/useI18n'
+import { getCache, setCache } from '../lib/dataCache'
 import {
   createInventoryItem,
   deleteInventoryItem,
@@ -247,7 +247,6 @@ function toMutationInput(form: IngredientFormState): InventoryMutationInput {
 
 export function FridgePage({
   onNavigate,
-  onLogout,
 }: {
   onNavigate: (page: AppDestination) => void
   onLogout?: () => void | Promise<void>
@@ -268,6 +267,10 @@ export function FridgePage({
   )
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const MAX_VISIBLE_ITEMS = 7
   const [formError, setFormError] = useState('')
   const summary = useMemo(() => buildSummary(ingredients), [ingredients])
   const aggregatedIngredients = useMemo(
@@ -352,12 +355,22 @@ export function FridgePage({
 
   useEffect(() => {
     let isMounted = true
+    const cacheKey = `inventory:${language}`
+
+    const cached = getCache<Ingredient[]>(cacheKey)
+    if (cached) {
+      setIngredients(cached)
+      setError(null)
+      setLoading(false)
+    }
 
     fetchInventory(language)
       .then((result) => {
         if (isMounted) {
+          setCache(cacheKey, result.inventory)
           setIngredients(result.inventory)
           setError(null)
+          setLoading(false)
         }
       })
       .catch((fetchError) => {
@@ -367,10 +380,6 @@ export function FridgePage({
               ? fetchError.message
               : t('fridge.fetchFailed'),
           )
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
           setLoading(false)
         }
       })
@@ -424,6 +433,7 @@ export function FridgePage({
       const result = input.inventoryId
         ? await updateInventoryItem(input)
         : await createInventoryItem(input)
+      setCache(`inventory:${language}`, result.inventory)
       setIngredients(result.inventory)
       setDetailIngredient((current) =>
         current
@@ -436,13 +446,13 @@ export function FridgePage({
         input.inventoryId ? t('fridge.status.updated') : t('fridge.status.added'),
       )
       setIsFormOpen(false)
+      setIsSaving(false)
     } catch (submitError) {
       setFormError(
         submitError instanceof Error
           ? submitError.message
           : t('fridge.status.saveFailed'),
       )
-    } finally {
       setIsSaving(false)
     }
   }
@@ -501,6 +511,7 @@ export function FridgePage({
       for (const inventoryId of uniqueIds) {
         const result = await deleteInventoryItem(inventoryId)
         latestInventory = result.inventory
+        setCache(`inventory:${language}`, latestInventory)
       }
 
       setIngredients(latestInventory)
@@ -516,13 +527,14 @@ export function FridgePage({
       setStatusMessage(
         t('fridge.selection.deletedCount', { count: uniqueIds.length }),
       )
+      setIsSaving(false)
+      setDeleteConfirm(null)
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
           ? deleteError.message
           : t('fridge.status.deleteFailed'),
       )
-    } finally {
       setIsSaving(false)
       setDeleteConfirm(null)
     }
@@ -556,45 +568,59 @@ export function FridgePage({
     setIsSelectionMode(true)
   }
 
+  function toggleCategoryExpanded(category: string) {
+    setExpandedCategories((current) => {
+      const next = new Set(current)
+      if (next.has(category)) {
+        next.delete(category)
+      } else {
+        next.add(category)
+      }
+      return next
+    })
+  }
+
   function handleExitSelection() {
     setSelectedInventoryIds(new Set())
     setIsSelectionMode(false)
   }
 
-  if (loading) {
-    return (
-      <div className="app-shell">
-        <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-        <div className="fridge-loading">
-          <div className="loading-spinner" />
-          <p>{t('fridge.loading')}</p>
-        </div>
-      </div>
-    )
-  }
-
   if (error) {
     return (
-      <div className="app-shell">
-        <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-        <div className="fridge-error">
-          <p>{t('fridge.fetchFailed')}: {error}</p>
-          <button
-            type="button"
-            className="primary-button"
-            onClick={() => window.location.reload()}
-          >
-            {t('common.reload')}
-          </button>
-        </div>
-      </div>
+      <>
+        <main className="fridge-container">
+          <div className="fridge-header">
+            <h1>{t('fridge.title')}</h1>
+            <div className="fridge-header-actions">
+              <button
+                type="button"
+                className="secondary-button back-home-button"
+                onClick={() => onNavigate('home')}
+              >
+                <div style={{ transform: 'scaleX(-1)', display: 'inline-flex' }}>
+                  <Icon name="arrow" />
+                </div>
+                <span>{t('common.backHome')}</span>
+              </button>
+            </div>
+          </div>
+          <div className="fridge-error">
+            <p>{t('fridge.fetchFailed')}: {error}</p>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => window.location.reload()}
+            >
+              {t('common.reload')}
+            </button>
+          </div>
+        </main>
+      </>
     )
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="fridge-container">
         <div className="fridge-header">
           <h1>{t('fridge.title')}</h1>
@@ -626,25 +652,32 @@ export function FridgePage({
           </p>
         ) : null}
 
-        <section className="fridge-summary" aria-label={t('fridge.summaryLabel')}>
-          <div className="summary-card">
-            <span className="card-label">{t('fridge.summary.total')}</span>
-            <strong className="card-value">{summary.totalCount}</strong>
-            <span className="card-note">{t('fridge.summary.totalNote')}</span>
+        {loading ? (
+          <div className="fridge-loading">
+            <div className="loading-spinner" />
+            <p>{t('fridge.loading')}</p>
           </div>
-          <div className="summary-card">
-            <span className="card-label">{t('fridge.summary.unique')}</span>
-            <strong className="card-value">{summary.uniqueNamesCount}</strong>
-            <span className="card-note">{t('fridge.summary.uniqueNote')}</span>
-          </div>
-          <div className="summary-card">
-            <span className="card-label">{t('fridge.summary.nearExpiration')}</span>
-            <strong className="card-value">{summary.nearExpirationCount}</strong>
-            <span className="card-note">
-              {t('fridge.summary.nearExpirationNote')}
-            </span>
-          </div>
-        </section>
+        ) : (
+          <div className="content-appear">
+            <section className="fridge-summary" aria-label={t('fridge.summaryLabel')}>
+              <div className="summary-card">
+                <span className="card-label">{t('fridge.summary.total')}</span>
+                <strong className="card-value">{summary.totalCount}</strong>
+                <span className="card-note">{t('fridge.summary.totalNote')}</span>
+              </div>
+              <div className="summary-card">
+                <span className="card-label">{t('fridge.summary.unique')}</span>
+                <strong className="card-value">{summary.uniqueNamesCount}</strong>
+                <span className="card-note">{t('fridge.summary.uniqueNote')}</span>
+              </div>
+              <div className="summary-card">
+                <span className="card-label">{t('fridge.summary.nearExpiration')}</span>
+                <strong className="card-value">{summary.nearExpirationCount}</strong>
+                <span className="card-note">
+                  {t('fridge.summary.nearExpirationNote')}
+                </span>
+              </div>
+            </section>
 
         <div className="category-filters">
           {categories.map((category) => (
@@ -728,7 +761,14 @@ export function FridgePage({
                   displayActiveCategory === allCategoryKey ||
                   displayActiveCategory === category,
               )
-              .map(([category, items]) => (
+              .map(([category, items]) => {
+                const isExpanded = expandedCategories.has(category)
+                const hasMore = items.length > MAX_VISIBLE_ITEMS
+                const visibleItems = isExpanded || !hasMore
+                  ? items
+                  : items.slice(0, MAX_VISIBLE_ITEMS)
+
+                return (
                 <div key={category} className="category-table-wrapper">
                   <h2 className="category-title">{getCategoryLabel(category)}</h2>
                   <div className="table-container">
@@ -748,7 +788,7 @@ export function FridgePage({
                         </tr>
                       </thead>
                       <tbody>
-                        {items.map((item) => {
+                        {visibleItems.map((item) => {
                           const isWarning =
                             isNearExpiration(item.nearestExpirationDate) ||
                             isNearExpiration(item.nearestBestBeforeDate)
@@ -835,10 +875,24 @@ export function FridgePage({
                       </tbody>
                     </table>
                   </div>
+                  {hasMore ? (
+                    <button
+                      type="button"
+                      className="small-button category-expand-toggle"
+                      onClick={() => toggleCategoryExpanded(category)}
+                    >
+                      {isExpanded
+                        ? t('fridge.expand.less')
+                        : t('fridge.expand.more', { remaining: items.length - MAX_VISIBLE_ITEMS })}
+                    </button>
+                  ) : null}
                 </div>
-              ))
+              )
+            })
           )}
         </div>
+          </div>
+        )}
       </main>
 
       {detailIngredient ? (
@@ -1109,6 +1163,6 @@ export function FridgePage({
           </form>
         </div>
       ) : null}
-    </div>
+    </>
   )
 }

@@ -995,6 +995,7 @@ async function handleRecipeGeneration(request, response, userId) {
       avoidedIngredients: body?.avoidedIngredients,
       cookingRequest: body?.cookingRequest,
       modelChoice: body?.model,
+      seasoningMode: body?.seasoningMode,
     })
 
     sendJson(response, 200, {

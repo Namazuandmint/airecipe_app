@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Topbar } from '../components/Topbar'
 import { generateGeminiContent } from '../lib/geminiApi'
 import { useI18n } from '../lib/useI18n'
 import type { AppDestination } from '../types/ui'
@@ -20,7 +19,6 @@ function readFileAsDataUrl(file: File) {
 
 export function GeminiTestPage({
   onNavigate,
-  onLogout,
 }: GeminiTestPageProps) {
   const { t } = useI18n()
   const [prompt, setPrompt] = useState(t('gemini.promptDefault'))
@@ -89,21 +87,19 @@ export function GeminiTestPage({
       setStatusMessage(
         t('gemini.success', { model: result.model }),
       )
+      setIsSending(false)
     } catch (error) {
       console.error('[vite] Gemini test failed:', error)
       setErrorMessage(
         error instanceof Error ? error.message : t('gemini.failed'),
       )
       setStatusMessage('')
-    } finally {
       setIsSending(false)
     }
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="test-page">
         <div className="fridge-header">
           <div>
@@ -215,6 +211,6 @@ export function GeminiTestPage({
           </div>
         </section>
       </main>
-    </div>
+    </>
   )
 }

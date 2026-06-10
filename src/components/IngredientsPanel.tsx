@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import type { Ingredient } from '../types/ui'
 import { useI18n } from '../lib/useI18n'
 
@@ -21,7 +22,7 @@ function getDaysUntilExpiration(ingredient: Ingredient) {
   )
 }
 
-export function IngredientsPanel({
+export const IngredientsPanel = memo(function IngredientsPanel({
   ingredients,
   onAddIngredient,
 }: {
@@ -29,25 +30,29 @@ export function IngredientsPanel({
   onAddIngredient?: () => void
 }) {
   const { t } = useI18n()
-  const visibleIngredients = [...ingredients]
-    .filter((ingredient) => {
-      const daysUntilExpiration = getDaysUntilExpiration(ingredient)
-
-      return (
-        daysUntilExpiration !== null &&
-        daysUntilExpiration >= 0 &&
-        daysUntilExpiration <= visibleExpirationDays
+  const visibleIngredients = useMemo(() => {
+    const withDays = ingredients
+      .map((ingredient) => ({
+        ingredient,
+        days: getDaysUntilExpiration(ingredient),
+      }))
+      .filter(
+        (entry): entry is { ingredient: Ingredient; days: number } =>
+          entry.days !== null &&
+          entry.days >= 0 &&
+          entry.days <= visibleExpirationDays,
       )
-    })
-    .sort((left, right) => {
-      const leftDays = getDaysUntilExpiration(left) ?? Number.MAX_SAFE_INTEGER
-      const rightDays = getDaysUntilExpiration(right) ?? Number.MAX_SAFE_INTEGER
 
-      return leftDays - rightDays
-    })
+    withDays.sort((left, right) => left.days - right.days)
+    return withDays.map((entry) => entry.ingredient)
+  }, [ingredients])
 
   return (
-    <section className="panel" id="ingredients" aria-labelledby="ingredients-title">
+    <section
+      className="panel"
+      id="ingredients"
+      aria-labelledby="ingredients-title"
+    >
       <div className="section-heading">
         <div>
           <p className="eyebrow">{t('home.ingredients.eyebrow')}</p>
@@ -75,4 +80,4 @@ export function IngredientsPanel({
       )}
     </section>
   )
-}
+})

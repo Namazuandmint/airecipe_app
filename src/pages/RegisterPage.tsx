@@ -44,11 +44,11 @@ export default function RegisterPage({
       if (result.user && !result.needsEmailConfirmation) {
         onAuthenticated?.(result.user);
       }
+      setIsLoading(false);
     } catch (error) {
       setErrorMessage(
         error instanceof Error ? error.message : t("login.registerFailed"),
       );
-    } finally {
       setIsLoading(false);
     }
   };

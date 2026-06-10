@@ -1,25 +1,18 @@
-import { useEffect, useRef, useState, type MutableRefObject } from 'react'
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from 'react'
 import './lib/supabase'
 import './lib/groq'
 import './lib/gemini'
 import './App.css'
-import { HomePage } from './pages/HomePage'
-import { FridgePage } from './pages/FridgePage'
-import { RecipeDetailPage } from './pages/RecipeDetailPage'
-import {
-  CookingHistoryPage,
-  type RecipeFilter,
-} from './pages/CookingHistoryPage'
-import { ReceiptScanPage } from './pages/ReceiptScanPage'
-import { GeminiTestPage } from './pages/GeminiTestPage'
-import { IngredientRegisterPage } from './pages/IngredientRegisterPage'
-import { ReceiptDetailRegisterPage } from './pages/ReceiptDetailRegisterPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { ContactPage } from './pages/ContactPage'
-import { AdminConsolePage } from './pages/AdminConsolePage'
-import { RecipeGeneratePage } from './pages/RecipeGeneratePage'
-import LoginScreen from './pages/LoginScreen'
-import RegisterPage from './pages/RegisterPage'
+import { PageShell } from './components/PageShell'
+import { preloadAllPageData } from './lib/preload'
 import {
   createSessionFromOAuthTokens,
   getCurrentUser,
@@ -27,7 +20,12 @@ import {
   type AuthTokenPair,
   type AuthUser,
 } from './lib/authApi'
-import type { AppDestination, Recipe, ReceiptIngredientCandidate } from './types/ui'
+import type {
+  AppDestination,
+  Recipe,
+  ReceiptIngredientCandidate,
+} from './types/ui'
+import type { RecipeFilter } from './pages/CookingHistoryPage'
 
 type Page = AppDestination | 'recipe' | 'receipt-detail'
 
@@ -36,64 +34,96 @@ type OAuthSessionRequest = {
   promise: ReturnType<typeof createSessionFromOAuthTokens>
 }
 
+const HomePage = lazy(() =>
+  import('./pages/HomePage').then((m) => ({ default: m.HomePage })),
+)
+const FridgePage = lazy(() =>
+  import('./pages/FridgePage').then((m) => ({ default: m.FridgePage })),
+)
+const RecipeDetailPage = lazy(() =>
+  import('./pages/RecipeDetailPage').then((m) => ({
+    default: m.RecipeDetailPage,
+  })),
+)
+const CookingHistoryPage = lazy(() =>
+  import('./pages/CookingHistoryPage').then((m) => ({
+    default: m.CookingHistoryPage,
+  })),
+)
+const ReceiptScanPage = lazy(() =>
+  import('./pages/ReceiptScanPage').then((m) => ({
+    default: m.ReceiptScanPage,
+  })),
+)
+const GeminiTestPage = lazy(() =>
+  import('./pages/GeminiTestPage').then((m) => ({ default: m.GeminiTestPage })),
+)
+const IngredientRegisterPage = lazy(() =>
+  import('./pages/IngredientRegisterPage').then((m) => ({
+    default: m.IngredientRegisterPage,
+  })),
+)
+const ReceiptDetailRegisterPage = lazy(() =>
+  import('./pages/ReceiptDetailRegisterPage').then((m) => ({
+    default: m.ReceiptDetailRegisterPage,
+  })),
+)
+const SettingsPage = lazy(() =>
+  import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })),
+)
+const ContactPage = lazy(() =>
+  import('./pages/ContactPage').then((m) => ({ default: m.ContactPage })),
+)
+const AdminConsolePage = lazy(() =>
+  import('./pages/AdminConsolePage').then((m) => ({
+    default: m.AdminConsolePage,
+  })),
+)
+const RecipeGeneratePage = lazy(() =>
+  import('./pages/RecipeGeneratePage').then((m) => ({
+    default: m.RecipeGeneratePage,
+  })),
+)
+const LoginScreen = lazy(() => import('./pages/LoginScreen'))
+const RegisterPage = lazy(() => import('./pages/RegisterPage'))
+
+const PAGE_FALLBACK = (
+  <div className="page-loading" aria-label="Loading page..." />
+)
+
 function getPageFromPath(): AppDestination {
-  if (window.location.pathname === '/fridge') {
-    return 'fridge'
+  switch (window.location.pathname) {
+    case '/fridge':
+      return 'fridge'
+    case '/history':
+      return 'history'
+    case '/receipt':
+      return 'receipt'
+    case '/recipe-generate':
+      return 'recipe-generate'
+    case '/ingredient-register':
+      return 'ingredient-register'
+    case '/receipt-detail':
+      return 'receipt-detail'
+    case '/test':
+      return 'test'
+    case '/login':
+      return 'login'
+    case '/register':
+      return 'register'
+    case '/settings':
+      return 'settings'
+    case '/contact':
+      return 'contact'
+    case '/admin':
+      return 'admin'
+    default:
+      return 'home'
   }
-
-  if (window.location.pathname === '/history') {
-    return 'history'
-  }
-
-  if (window.location.pathname === '/receipt') {
-    return 'receipt'
-  }
-
-  if (window.location.pathname === '/recipe-generate') {
-    return 'recipe-generate'
-  }
-
-  if (window.location.pathname === '/ingredient-register') {
-    return 'ingredient-register'
-  }
-
-  if (window.location.pathname === '/receipt-detail') {
-    return 'receipt-detail'
-  }
-
-  if (window.location.pathname === '/test') {
-    return 'test'
-  }
-
-  if (window.location.pathname === '/login') {
-    return 'login'
-  }
-
-  if (window.location.pathname === '/register') {
-    return 'register'
-  }
-
-  if (window.location.pathname === '/settings') {
-    return 'settings'
-  }
-
-  if (window.location.pathname === '/contact') {
-    return 'contact'
-  }
-
-  if (window.location.pathname === '/admin') {
-    return 'admin'
-  }
-
-  return 'home'
 }
 
 function getPathForPage(page: AppDestination) {
-  if (page === 'home') {
-    return '/'
-  }
-
-  return `/${page}`
+  return page === 'home' ? '/' : `/${page}`
 }
 
 function replacePath(path: string) {
@@ -168,12 +198,22 @@ function App() {
   const [recipeBackPage, setRecipeBackPage] = useState<AppDestination>('home')
   const [historyInitialFilter, setHistoryInitialFilter] =
     useState<RecipeFilter>('all')
-  const [selectedReceiptItems, setSelectedReceiptItems] = useState<ReceiptIngredientCandidate[]>([])
+  const [selectedReceiptItems, setSelectedReceiptItems] = useState<
+    ReceiptIngredientCandidate[]
+  >([])
   const [receiptDetailBackPage, setReceiptDetailBackPage] =
     useState<AppDestination>('receipt')
   const [passwordResetTokens, setPasswordResetTokens] =
     useState<AuthTokenPair | null>(null)
   const oauthSessionRequestRef = useRef<OAuthSessionRequest | null>(null)
+  const hasPreloaded = useRef(false)
+
+  useEffect(() => {
+    if (currentUser && !hasPreloaded.current) {
+      hasPreloaded.current = true
+      void preloadAllPageData()
+    }
+  }, [currentUser])
 
   useEffect(() => {
     let isMounted = true
@@ -195,6 +235,7 @@ function App() {
             setCurrentUser(null)
             replacePath('/login')
             setCurrentPage('login')
+            setIsAuthLoading(false)
             return
           }
 
@@ -211,6 +252,7 @@ function App() {
           setPasswordResetTokens(null)
           replacePath('/')
           setCurrentPage('home')
+          setIsAuthLoading(false)
           return
         }
 
@@ -230,6 +272,7 @@ function App() {
           replacePath('/')
           setCurrentPage('home')
         }
+        setIsAuthLoading(false)
       } catch {
         if (!isMounted) {
           return
@@ -243,10 +286,7 @@ function App() {
           replacePath('/login')
           setCurrentPage('login')
         }
-      } finally {
-        if (isMounted) {
-          setIsAuthLoading(false)
-        }
+        setIsAuthLoading(false)
       }
     }
 
@@ -275,23 +315,26 @@ function App() {
     return () => window.removeEventListener('popstate', handlePopState)
   }, [currentUser])
 
-  function handleNavigate(page: AppDestination) {
-    if (!currentUser && page !== 'login' && page !== 'register') {
-      pushPath('/login')
-      setCurrentPage('login')
-      return
-    }
+  const handleNavigate = useCallback(
+    (page: AppDestination) => {
+      if (!currentUser && page !== 'login' && page !== 'register') {
+        pushPath('/login')
+        setCurrentPage('login')
+        return
+      }
 
-    pushPath(getPathForPage(page))
+      pushPath(getPathForPage(page))
 
-    if (page === 'history') {
-      setHistoryInitialFilter('all')
-    }
+      if (page === 'history') {
+        setHistoryInitialFilter('all')
+      }
 
-    setCurrentPage(page)
-  }
+      setCurrentPage(page)
+    },
+    [currentUser],
+  )
 
-  function handleNavigateToFavoriteHistory() {
+  const handleNavigateToFavoriteHistory = useCallback(() => {
     if (!currentUser) {
       handleNavigate('login')
       return
@@ -300,16 +343,16 @@ function App() {
     setHistoryInitialFilter('favorite')
     pushPath('/history')
     setCurrentPage('history')
-  }
+  }, [currentUser, handleNavigate])
 
-  function handleAuthenticated(user: AuthUser) {
+  const handleAuthenticated = useCallback((user: AuthUser) => {
     setCurrentUser(user)
     setPasswordResetTokens(null)
     replacePath('/')
     setCurrentPage('home')
-  }
+  }, [])
 
-  async function handleLogout() {
+  const handleLogout = useCallback(async () => {
     await logout().catch((error) => {
       console.warn('[vite] Logout failed:', error)
     })
@@ -318,38 +361,72 @@ function App() {
     setPasswordResetTokens(null)
     replacePath('/login')
     setCurrentPage('login')
-  }
+  }, [])
 
-  function handleSelectRecipe(recipe: Recipe) {
-    if (!currentUser) {
-      handleNavigate('login')
-      return
-    }
+  const handleSelectRecipe = useCallback(
+    (recipe: Recipe) => {
+      if (!currentUser) {
+        handleNavigate('login')
+        return
+      }
 
-    setRecipeBackPage(
-      currentPage === 'history'
-        ? 'history'
-        : currentPage === 'recipe-generate'
-          ? 'recipe-generate'
-          : 'home',
-    )
-    setSelectedRecipe(recipe)
-    setCurrentPage('recipe')
-  }
+      setRecipeBackPage(
+        currentPage === 'history'
+          ? 'history'
+          : currentPage === 'recipe-generate'
+            ? 'recipe-generate'
+            : 'home',
+      )
+      setSelectedRecipe(recipe)
+      setCurrentPage('recipe')
+    },
+    [currentPage, currentUser, handleNavigate],
+  )
 
-  function handleContinueIngredientRegister(names: string[]) {
-    setSelectedReceiptItems(namesToReceiptCandidates(names))
-    setReceiptDetailBackPage('ingredient-register')
-    handleNavigate('receipt-detail')
-  }
+  const handleContinueIngredientRegister = useCallback(
+    (names: string[]) => {
+      setSelectedReceiptItems(namesToReceiptCandidates(names))
+      setReceiptDetailBackPage('ingredient-register')
+      handleNavigate('receipt-detail')
+    },
+    [handleNavigate],
+  )
 
-  function handleContinueIngredientRegisterCandidates(
-    items: ReceiptIngredientCandidate[],
-  ) {
-    setSelectedReceiptItems(items)
-    setReceiptDetailBackPage('ingredient-register')
-    handleNavigate('receipt-detail')
-  }
+  const handleContinueIngredientRegisterCandidates = useCallback(
+    (items: ReceiptIngredientCandidate[]) => {
+      setSelectedReceiptItems(items)
+      setReceiptDetailBackPage('ingredient-register')
+      handleNavigate('receipt-detail')
+    },
+    [handleNavigate],
+  )
+
+  const handleNavigateToRegister = useCallback(() => {
+    pushPath('/register')
+    setCurrentPage('register')
+  }, [])
+
+  const handleNavigateToLogin = useCallback(() => {
+    pushPath('/login')
+    setCurrentPage('login')
+  }, [])
+
+  const handleProceedToDetail = useCallback(
+    (items: ReceiptIngredientCandidate[]) => {
+      setSelectedReceiptItems(items)
+      setReceiptDetailBackPage('receipt')
+      handleNavigate('receipt-detail')
+    },
+    [handleNavigate],
+  )
+
+  const handleRecipeBack = useCallback(() => {
+    setCurrentPage(recipeBackPage)
+  }, [recipeBackPage])
+
+  const handleReceiptDetailBack = useCallback(() => {
+    handleNavigate(receiptDetailBackPage)
+  }, [handleNavigate, receiptDetailBackPage])
 
   if (isAuthLoading) {
     return null
@@ -358,147 +435,143 @@ function App() {
   if (!currentUser) {
     if (currentPage === 'register') {
       return (
-        <RegisterPage
-          onAuthenticated={handleAuthenticated}
-          onNavigateToLogin={() => {
-            pushPath('/login')
-            setCurrentPage('login')
-          }}
-        />
+        <Suspense fallback={PAGE_FALLBACK}>
+          <RegisterPage
+            onAuthenticated={handleAuthenticated}
+            onNavigateToLogin={handleNavigateToLogin}
+          />
+        </Suspense>
       )
     }
 
     return (
-      <LoginScreen
-        passwordResetTokens={passwordResetTokens}
-        onAuthenticated={handleAuthenticated}
-        onNavigateToRegister={() => {
-          pushPath('/register')
-          setCurrentPage('register')
-        }}
-      />
+      <Suspense fallback={PAGE_FALLBACK}>
+        <LoginScreen
+          passwordResetTokens={passwordResetTokens}
+          onAuthenticated={handleAuthenticated}
+          onNavigateToRegister={handleNavigateToRegister}
+        />
+      </Suspense>
     )
   }
 
-  if (currentPage === 'fridge') {
-    return <FridgePage onNavigate={handleNavigate} onLogout={handleLogout} />
-  }
-
-  if (currentPage === 'history') {
-    return (
-      <CookingHistoryPage
-        onNavigate={handleNavigate}
-        onSelectRecipe={handleSelectRecipe}
-        onLogout={handleLogout}
-        initialFilter={historyInitialFilter}
-      />
-    )
-  }
-
-  if (currentPage === 'receipt') {
-    return (
-      <ReceiptScanPage
-        onNavigate={handleNavigate}
-        onLogout={handleLogout}
-        onProceedToDetail={(items: ReceiptIngredientCandidate[]) => {
-          setSelectedReceiptItems(items)
-          setReceiptDetailBackPage('receipt')
-          handleNavigate('receipt-detail')
-        }}
-      />
-    )
-  }
-
-  if (currentPage === 'recipe-generate') {
-    return (
-      <RecipeGeneratePage
-        onNavigate={handleNavigate}
-        onSelectRecipe={handleSelectRecipe}
-        onLogout={handleLogout}
-      />
-    )
-  }
-
-  if (currentPage === 'ingredient-register') {
-    return (
-      <IngredientRegisterPage
-        onNavigate={handleNavigate}
-        onLogout={handleLogout}
-        onContinue={handleContinueIngredientRegister}
-        onContinueCandidates={handleContinueIngredientRegisterCandidates}
-      />
-    )
-  }
-
-  if (currentPage === 'receipt-detail') {
-    return (
-      <ReceiptDetailRegisterPage
-        items={selectedReceiptItems}
-        onBack={() => handleNavigate(receiptDetailBackPage)}
-        onNavigate={handleNavigate}
-        onLogout={handleLogout}
-      />
-    )
-  }
-
-  if (currentPage === 'test') {
-    return <GeminiTestPage onNavigate={handleNavigate} onLogout={handleLogout} />
-  }
-
-  if (currentPage === 'settings') {
-    return (
-      <SettingsPage
-        user={currentUser}
-        onNavigate={handleNavigate}
-        onLogout={handleLogout}
-      />
-    )
-  }
-
-  if (currentPage === 'contact') {
-    return <ContactPage onNavigate={handleNavigate} onLogout={handleLogout} />
-  }
-
-  if (currentPage === 'admin') {
-    return (
-      <AdminConsolePage
-        user={currentUser}
-        onNavigate={handleNavigate}
-        onLogout={handleLogout}
-      />
-    )
-  }
-
-  if (currentPage === 'login') {
-    return (
-      <HomePage
-        onNavigate={handleNavigate}
-        onSelectRecipe={handleSelectRecipe}
-        onLogout={handleLogout}
-        onShowFavorites={handleNavigateToFavoriteHistory}
-      />
-    )
-  }
-
-  if (currentPage === 'recipe' && selectedRecipe) {
-    return (
-      <RecipeDetailPage
-        recipe={selectedRecipe}
-        onBack={() => setCurrentPage(recipeBackPage)}
-        onNavigate={handleNavigate}
-        onLogout={handleLogout}
-      />
-    )
-  }
-
-  return (
-    <HomePage
-      onNavigate={handleNavigate}
-      onSelectRecipe={handleSelectRecipe}
-      onLogout={handleLogout}
-      onShowFavorites={handleNavigateToFavoriteHistory}
-    />
+  let pageNode: React.ReactNode
+  const shell = (children: React.ReactNode) => (
+    <PageShell key={currentPage} onNavigate={handleNavigate} onLogout={handleLogout}>
+      {children}
+    </PageShell>
   )
+  switch (currentPage) {
+    case 'fridge':
+      pageNode = <FridgePage onNavigate={handleNavigate} onLogout={handleLogout} />
+      break
+    case 'history':
+      pageNode = (
+        <CookingHistoryPage
+          onNavigate={handleNavigate}
+          onSelectRecipe={handleSelectRecipe}
+          onLogout={handleLogout}
+          initialFilter={historyInitialFilter}
+        />
+      )
+      break
+    case 'receipt':
+      pageNode = (
+        <ReceiptScanPage
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+          onProceedToDetail={handleProceedToDetail}
+        />
+      )
+      break
+    case 'recipe-generate':
+      pageNode = (
+        <RecipeGeneratePage
+          onNavigate={handleNavigate}
+          onSelectRecipe={handleSelectRecipe}
+          onLogout={handleLogout}
+        />
+      )
+      break
+    case 'ingredient-register':
+      pageNode = (
+        <IngredientRegisterPage
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+          onContinue={handleContinueIngredientRegister}
+          onContinueCandidates={handleContinueIngredientRegisterCandidates}
+        />
+      )
+      break
+    case 'receipt-detail':
+      pageNode = (
+        <ReceiptDetailRegisterPage
+          items={selectedReceiptItems}
+          onBack={handleReceiptDetailBack}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
+      )
+      break
+    case 'test':
+      pageNode = (
+        <GeminiTestPage onNavigate={handleNavigate} onLogout={handleLogout} />
+      )
+      break
+    case 'settings':
+      pageNode = (
+        <SettingsPage
+          user={currentUser}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
+      )
+      break
+    case 'contact':
+      pageNode = (
+        <ContactPage onNavigate={handleNavigate} onLogout={handleLogout} />
+      )
+      break
+    case 'admin':
+      pageNode = (
+        <AdminConsolePage
+          user={currentUser}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
+      )
+      break
+    case 'recipe':
+      pageNode = selectedRecipe ? (
+        <RecipeDetailPage
+          recipe={selectedRecipe}
+          onBack={handleRecipeBack}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        />
+      ) : (
+        <HomePage
+          onNavigate={handleNavigate}
+          onSelectRecipe={handleSelectRecipe}
+          onLogout={handleLogout}
+          onShowFavorites={handleNavigateToFavoriteHistory}
+        />
+      )
+      break
+    case 'login':
+    case 'home':
+    default:
+      pageNode = (
+        <HomePage
+          onNavigate={handleNavigate}
+          onSelectRecipe={handleSelectRecipe}
+          onLogout={handleLogout}
+          onShowFavorites={handleNavigateToFavoriteHistory}
+        />
+      )
+  }
+
+  return <Suspense fallback={PAGE_FALLBACK}>{shell(pageNode)}</Suspense>
 }
 
 export default App

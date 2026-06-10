@@ -5,6 +5,7 @@ export const defaultPreferences: UserPreferences = {
   defaultServings: 2,
   avoidedIngredients: '',
   recipeModel: 'groq',
+  seasoningMode: 'unlimited',
   notifications: {
     expiration: true,
     lowStock: false,

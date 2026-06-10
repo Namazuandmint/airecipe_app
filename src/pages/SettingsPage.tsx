@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Icon } from '../components/Icon'
-import { Topbar } from '../components/Topbar'
 import { supportedLanguages } from '../lib/i18n'
+import { getCache, setCache } from '../lib/dataCache'
 import { useI18n } from '../lib/useI18n'
 import {
   defaultPreferences,
@@ -43,12 +43,21 @@ export function SettingsPage({
 
   useEffect(() => {
     let isMounted = true
+    const cacheKey = `preferences:${user.id}`
+
+    const cached = getCache<UserPreferences>(cacheKey)
+    if (cached) {
+      setPreferences(cached)
+      setIsLoadingPreferences(false)
+    }
 
     fetchPreferences()
       .then((result) => {
         if (isMounted) {
+          setCache(cacheKey, result.preferences)
           setPreferences(result.preferences)
           setPreferencesError('')
+          setIsLoadingPreferences(false)
         }
       })
       .catch((error) => {
@@ -59,10 +68,6 @@ export function SettingsPage({
               ? error.message
               : 'settings.preferencesLoadFailed',
           )
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
           setIsLoadingPreferences(false)
         }
       })
@@ -107,9 +112,11 @@ export function SettingsPage({
     setPreferencesError('')
 
     try {
-      const result = await savePreferences(preferences)
-      setPreferences(result.preferences)
+        const result = await savePreferences(preferences)
+        setCache(`preferences:${user.id}`, result.preferences)
+        setPreferences(result.preferences)
       setPreferencesMessage(t('settings.preferencesSaved'))
+      setIsSavingPreferences(false)
     } catch (error) {
       console.error('[vite] Preferences save failed:', error)
       setPreferencesError(
@@ -117,7 +124,6 @@ export function SettingsPage({
           ? error.message
           : t('settings.preferencesSaveFailed'),
       )
-    } finally {
       setIsSavingPreferences(false)
     }
   }
@@ -132,9 +138,7 @@ export function SettingsPage({
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="settings-page">
         <div className="fridge-header">
           <div>
@@ -374,6 +378,34 @@ export function SettingsPage({
               </label>
             </fieldset>
 
+            <fieldset className="settings-fieldset settings-fieldset--plain">
+              <legend>{t('settings.seasoningMode')}</legend>
+              <p className="settings-section__description">
+                {t('settings.seasoningModeDescription')}
+              </p>
+              <div className="language-options" role="radiogroup">
+                {([
+                  ['unlimited', t('settings.seasoningUnlimited'), t('settings.seasoningUnlimitedNote')],
+                  ['strict', t('settings.seasoningStrict'), t('settings.seasoningStrictNote')],
+                ] as const).map(([value, label, note]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`language-option ${
+                      preferences.seasoningMode === value ? 'is-active' : ''
+                    }`}
+                    role="radio"
+                    aria-checked={preferences.seasoningMode === value}
+                    disabled={isLoadingPreferences || isSavingPreferences}
+                    onClick={() => updatePreference('seasoningMode', value)}
+                  >
+                    <strong>{label}</strong>
+                    <span>{note}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
             <button
               type="submit"
               className="primary-button settings-save-button"
@@ -448,6 +480,6 @@ export function SettingsPage({
           </article>
         </section>
       </main>
-    </div>
+    </>
   )
 }

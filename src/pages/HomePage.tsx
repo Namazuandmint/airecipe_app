@@ -4,8 +4,8 @@ import { HeroPanel } from '../components/HeroPanel'
 import { IngredientsPanel } from '../components/IngredientsPanel'
 import { RecipesPanel } from '../components/RecipesPanel'
 import { SummaryGrid } from '../components/SummaryGrid'
-import { Topbar } from '../components/Topbar'
 import { getSecondaryFeatures } from '../data/home'
+import { getCache, setCache } from '../lib/dataCache'
 import type { TranslateFn } from '../lib/i18n'
 import { useI18n } from '../lib/useI18n'
 import {
@@ -103,12 +103,12 @@ function buildSummaryItems(
 export function HomePage({
   onNavigate,
   onSelectRecipe,
-  onLogout,
   onShowFavorites,
 }: HomePageProps) {
   const { language, t } = useI18n()
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [recipes, setRecipes] = useState<Recipe[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isCooking, setIsCooking] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
@@ -124,43 +124,65 @@ export function HomePage({
 
   useEffect(() => {
     let isMounted = true
+    const cacheKey = `home:${language}`
 
-    fetchInventory(language)
-      .then((result) => {
-        if (isMounted) {
-          setIngredients(result.inventory)
-        }
-      })
-      .catch((error) => {
-        console.warn('[vite] Inventory fetch failed:', error)
-        if (isMounted) {
+    const cached = getCache<{
+      ingredients: Ingredient[]
+      recipes: Recipe[]
+      preferences: UserPreferences
+    }>(cacheKey)
+    if (cached) {
+      setIngredients(cached.ingredients)
+      setRecipes(cached.recipes)
+      setPreferences(cached.preferences)
+      setIsLoading(false)
+    }
+
+    Promise.allSettled([
+      fetchInventory(language),
+      fetchSavedRecipes(language),
+      fetchPreferences(),
+    ]).then(([inventoryResult, recipesResult, preferencesResult]) => {
+      if (!isMounted) {
+        return
+      }
+
+      if (inventoryResult.status === 'fulfilled') {
+        setIngredients(inventoryResult.value.inventory)
+      } else {
+        console.warn('[vite] Inventory fetch failed:', inventoryResult.reason)
+        if (!cached) {
+          const error = inventoryResult.reason
           setStatusMessage(
             error instanceof Error
               ? error.message
               : t('home.status.inventoryFetchFailed'),
           )
         }
-      })
+      }
 
-    fetchSavedRecipes(language)
-      .then((result) => {
-        if (isMounted) {
-          setRecipes(result.recipes)
-        }
-      })
-      .catch((error) => {
-        console.warn('[vite] Saved recipes fetch failed:', error)
-      })
+      if (recipesResult.status === 'fulfilled') {
+        setRecipes(recipesResult.value.recipes)
+      } else {
+        console.warn('[vite] Saved recipes fetch failed:', recipesResult.reason)
+      }
 
-    fetchPreferences()
-      .then((result) => {
-        if (isMounted) {
-          setPreferences(result.preferences)
-        }
-      })
-      .catch((error) => {
-        console.warn('[vite] Preferences fetch failed:', error)
-      })
+      if (preferencesResult.status === 'fulfilled') {
+        setPreferences(preferencesResult.value.preferences)
+      } else {
+        console.warn('[vite] Preferences fetch failed:', preferencesResult.reason)
+      }
+
+      if (inventoryResult.status === 'fulfilled' && recipesResult.status === 'fulfilled' && preferencesResult.status === 'fulfilled') {
+        setCache(cacheKey, {
+          ingredients: inventoryResult.value.inventory,
+          recipes: recipesResult.value.recipes,
+          preferences: preferencesResult.value.preferences,
+        })
+      }
+
+      setIsLoading(false)
+    })
 
     return () => {
       isMounted = false
@@ -183,18 +205,19 @@ export function HomePage({
         preferences.avoidedIngredients,
         undefined,
         preferences.recipeModel,
+        preferences.seasoningMode,
       )
 
       if (result.recipes.length) {
         setRecipes(result.recipes)
         setStatusMessage(t('home.status.generateSuccess'))
       }
+      setIsGenerating(false)
     } catch (error) {
       console.error('[vite] Recipe generation failed:', error)
       setStatusMessage(
         error instanceof Error ? error.message : t('home.status.generateFailed'),
       )
-    } finally {
       setIsGenerating(false)
     }
   }
@@ -222,6 +245,7 @@ export function HomePage({
       setIngredients(result.inventory)
       setStatusMessage(t('home.status.cookingUpdated', { servings }))
       setCookingRecipe(null)
+      setIsCooking(false)
     } catch (error) {
       console.error('[vite] Cooking update failed:', error)
       setStatusMessage(
@@ -229,15 +253,12 @@ export function HomePage({
           ? error.message
           : t('home.status.inventoryUpdateFailed'),
       )
-    } finally {
       setIsCooking(false)
     }
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="home">
         <HeroPanel
           isGenerating={isGenerating}
@@ -253,21 +274,30 @@ export function HomePage({
           </p>
         ) : null}
 
-        <SummaryGrid items={currentSummaryItems} />
+        {isLoading ? (
+          <div className="fridge-loading">
+            <div className="loading-spinner" />
+            <p>{t('common.loading')}</p>
+          </div>
+        ) : (
+          <div className="content-appear">
+            <SummaryGrid items={currentSummaryItems} />
 
-        <div className="dashboard-grid">
-          <IngredientsPanel
-            ingredients={ingredients}
-            onAddIngredient={() => onNavigate?.('ingredient-register')}
-          />
-          <RecipesPanel
-            recipes={recipes}
-            isGenerating={isGenerating}
-            onGenerateRecipe={handleGenerateRecipe}
-            onSelectRecipe={onSelectRecipe}
-            onCookRecipe={openCookedDialog}
-          />
-        </div>
+            <div className="dashboard-grid">
+              <IngredientsPanel
+                ingredients={ingredients}
+                onAddIngredient={() => onNavigate?.('ingredient-register')}
+              />
+              <RecipesPanel
+                recipes={recipes}
+                isGenerating={isGenerating}
+                onGenerateRecipe={handleGenerateRecipe}
+                onSelectRecipe={onSelectRecipe}
+                onCookRecipe={openCookedDialog}
+              />
+            </div>
+          </div>
+        )}
 
         <section
           className="secondary-section"
@@ -339,6 +369,6 @@ export function HomePage({
           </section>
         </div>
       ) : null}
-    </div>
+    </>
   )
 }

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Topbar } from '../components/Topbar'
 import { importReceiptItemsDetail } from '../lib/receiptApi'
 import { useI18n } from '../lib/useI18n'
 import type { AppDestination, ReceiptIngredientCandidate } from '../types/ui'
@@ -75,7 +74,6 @@ export function ReceiptDetailRegisterPage({
   items,
   onBack,
   onNavigate,
-  onLogout,
   embedded = false,
 }: ReceiptDetailRegisterPageProps) {
   const { t } = useI18n()
@@ -132,10 +130,10 @@ export function ReceiptDetailRegisterPage({
       setStatusMessage(
         t('receiptDetail.importSuccess', { count: result.importedCount }),
       )
+      setIsSubmitting(false)
     } catch (error) {
       console.error('[vite] Import detail failed:', error)
       setErrorMessage(t('receiptDetail.importFailed'))
-    } finally {
       setIsSubmitting(false)
     }
   }
@@ -347,9 +345,8 @@ export function ReceiptDetailRegisterPage({
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
+    <>
       {content}
-    </div>
+    </>
   )
 }

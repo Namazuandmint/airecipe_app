@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react'
 import { Icon } from '../components/Icon'
-import { Topbar } from '../components/Topbar'
 import { submitContactMessage } from '../lib/contactApi'
 import { useI18n } from '../lib/useI18n'
 import type { AppDestination } from '../types/ui'
@@ -10,7 +9,7 @@ type ContactPageProps = {
   onLogout?: () => void | Promise<void>
 }
 
-export function ContactPage({ onNavigate, onLogout }: ContactPageProps) {
+export function ContactPage({ onNavigate }: ContactPageProps) {
   const { t } = useI18n()
   const [subject, setSubject] = useState('')
   const [message, setMessage] = useState('')
@@ -44,20 +43,18 @@ export function ContactPage({ onNavigate, onLogout }: ContactPageProps) {
       setSubject('')
       setMessage('')
       setStatusMessage(t('contact.success'))
+      setIsSubmitting(false)
     } catch (error) {
       console.error('[vite] Contact submit failed:', error)
       setErrorMessage(
         error instanceof Error ? error.message : t('contact.failed'),
       )
-    } finally {
       setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="settings-page contact-page">
         <div className="fridge-header">
           <div>
@@ -130,6 +127,6 @@ export function ContactPage({ onNavigate, onLogout }: ContactPageProps) {
           </div>
         </form>
       </main>
-    </div>
+    </>
   )
 }

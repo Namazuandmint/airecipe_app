@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { Topbar } from '../components/Topbar'
 import { parseReceiptText } from '../lib/receiptApi'
 import { recognizeReceiptImage } from '../lib/receiptOcr'
 import { useI18n } from '../lib/useI18n'
@@ -130,7 +129,6 @@ function localFallbackParseReceiptText(text: string) {
 
 export function ReceiptScanPage({
   onNavigate,
-  onLogout,
   onProceedToDetail,
   embedded = false,
   allowManualCandidates = true,
@@ -185,6 +183,7 @@ export function ReceiptScanPage({
       const result = await parseReceiptText(text)
       setCandidates(normalizeCandidates(result.items))
       setStatusMessage(successMessage)
+      setIsParsing(false)
     } catch (error) {
       console.error('[vite] Receipt parse failed:', error)
       const fallbackItems = localFallbackParseReceiptText(text)
@@ -197,7 +196,6 @@ export function ReceiptScanPage({
         setErrorMessage(t('receipt.parseFailed'))
         setStatusMessage('')
       }
-    } finally {
       setIsParsing(false)
     }
   }
@@ -222,15 +220,14 @@ export function ReceiptScanPage({
         setProgressLabel(status)
       })
       setOcrText(text)
-      setIsReading(false)
       await parseOcrText(
         text,
         t('receipt.parseSuccess'),
       )
+      setIsReading(false)
     } catch (error) {
       console.error('[vite] Receipt OCR failed:', error)
       setErrorMessage(t('receipt.readFailed'))
-    } finally {
       setIsReading(false)
     }
   }
@@ -607,9 +604,8 @@ export function ReceiptScanPage({
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
+    <>
       {content}
-    </div>
+    </>
   )
 }

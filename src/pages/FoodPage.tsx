@@ -3,7 +3,6 @@ import { HeroPanel } from '../components/HeroPanel'
 import { IngredientsPanel } from '../components/IngredientsPanel'
 import { RecipesPanel } from '../components/RecipesPanel'
 import { SummaryGrid } from '../components/SummaryGrid'
-import { Topbar } from '../components/Topbar'
 import {
   expiringIngredients,
   getPrimaryFeatures,
@@ -19,9 +18,7 @@ export function FoodPage() {
   const secondaryFeatures = getSecondaryFeatures(t)
 
   return (
-    <div className="app-shell">
-      <Topbar />
-
+    <>
       <main className="home">
         <HeroPanel isGenerating={false} onGenerateRecipe={() => undefined} />
 
@@ -52,6 +49,6 @@ export function FoodPage() {
           </div>
         </section>
       </main>
-    </div>
+    </>
   )
 }
