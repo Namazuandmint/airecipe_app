@@ -32,9 +32,17 @@ type IngredientFormState = {
   memo: string
 }
 
+const formCategories = [
+  '肉・卵・魚',
+  '野菜',
+  '乳製品',
+  '加工品',
+  'その他',
+]
+
 const emptyForm: IngredientFormState = {
   name: '',
-  category: 'その他',
+  category: '',
   quantity: '',
   gram: '',
   expirationDate: '',
@@ -81,6 +89,29 @@ function formatDate(value: string | null | undefined, language: string) {
   }).format(date)
 }
 
+function formatStock(
+  quantity: number | null | undefined,
+  gram: number | null | undefined,
+  language: string,
+) {
+  const parts: string[] = []
+
+  if (quantity !== null && quantity !== undefined && quantity > 0) {
+    const unit = language === 'ja' ? '個' : 'pc(s)'
+    parts.push(`${quantity}${unit}`)
+  }
+
+  if (gram !== null && gram !== undefined && gram > 0) {
+    parts.push(`${gram}g`)
+  }
+
+  if (parts.length === 0) {
+    return '-'
+  }
+
+  return parts.join(' / ')
+}
+
 function buildSummary(ingredients: Ingredient[]): Summary {
   return {
     totalCount: ingredients.length,
@@ -96,7 +127,7 @@ function buildFormFromIngredient(ingredient: Ingredient): IngredientFormState {
   return {
     inventoryId: ingredient.inventoryId,
     name: ingredient.name,
-    category: ingredient.category ?? 'その他',
+    category: ingredient.category ?? '',
     quantity: ingredient.quantity ? String(ingredient.quantity) : '',
     gram: ingredient.gram ? String(ingredient.gram) : '',
     expirationDate: ingredient.expirationDate ?? '',
@@ -217,6 +248,11 @@ export function FridgePage({
 
     if (!input.name) {
       setFormError(t('fridge.form.nameRequired'))
+      return
+    }
+
+    if (!formState.category || formState.category === '') {
+      setFormError(t('fridge.form.categoryRequired'))
       return
     }
 
@@ -488,7 +524,7 @@ export function FridgePage({
                               </td>
                               <td>
                                 <span className="amount-text">
-                                  {item.amount}
+                                  {formatStock(item.quantity, item.gram, language)}
                                 </span>
                               </td>
                               <td>
@@ -563,13 +599,23 @@ export function FridgePage({
               </label>
               <label>
                 <span>{t('fridge.form.category')}</span>
-                <input
-                  value={formState.category}
-                  onChange={(event) =>
-                    updateFormField('category', event.target.value)
-                  }
-                  placeholder={t('fridge.form.categoryPlaceholder')}
-                />
+                <div className="select-wrapper">
+                  <select
+                    value={formState.category}
+                    onChange={(event) =>
+                      updateFormField('category', event.target.value)
+                    }
+                  >
+                    <option value="" disabled>
+                      {t('fridge.form.categorySelect')}
+                    </option>
+                    {formCategories.map((cat) => (
+                      <option key={cat} value={cat}>
+                        {cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </label>
               <label>
                 <span>{t('fridge.form.quantity')}</span>
