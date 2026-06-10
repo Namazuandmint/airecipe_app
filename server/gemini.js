@@ -2,8 +2,10 @@ import './env.js'
 
 const geminiApiKey = process.env.GEMINI_API_KEY
 export const geminiModelQueue = [
-  { model: 'gemini-2.5-flash', requestsPerMinute: 5 },
+  { model: 'gemini-3.1-flash-lite', requestsPerMinute: 10 },
   { model: 'gemini-2.5-flash-lite', requestsPerMinute: 10 },
+  { model: 'gemini-3-flash-preview', requestsPerMinute: 5 },
+  { model: 'gemini-2.5-flash', requestsPerMinute: 5 },
 ]
 export const defaultGeminiModel = geminiModelQueue[0].model
 const geminiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta'

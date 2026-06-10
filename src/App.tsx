@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import './lib/supabase'
 import './lib/groq'
+import './lib/gemini'
 import './App.css'
 import { HomePage } from './pages/HomePage'
 import { FridgePage } from './pages/FridgePage'
