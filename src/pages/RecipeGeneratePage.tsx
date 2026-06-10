@@ -117,6 +117,7 @@ export function RecipeGeneratePage({
         language,
         preferences.avoidedIngredients,
         cookingRequest,
+        preferences.recipeModel,
       )
 
       setRecipes(result.recipes)

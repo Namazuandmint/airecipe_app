@@ -1265,6 +1265,10 @@ button:disabled {
   align-content: start;
 }
 
+.settings-ai-card .language-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .settings-section__description {
   margin: 0 0 18px;
   color: var(--muted);
@@ -1435,6 +1439,11 @@ button:disabled {
   background: var(--surface-soft);
 }
 
+.settings-fieldset--plain {
+  padding: 0;
+  background: transparent;
+}
+
 .settings-fieldset p {
   margin: 0;
 }
@@ -1466,6 +1475,20 @@ button:disabled {
 
 .settings-admin-button {
   margin-top: 16px;
+}
+
+.settings-account-card {
+  display: grid;
+  gap: 14px;
+}
+
+.settings-account-card .settings-section__description,
+.settings-account-card .settings-admin-button {
+  margin-bottom: 0;
+}
+
+.settings-account-card .settings-session-row {
+  margin-top: 2px;
 }
 
 .contact-page,

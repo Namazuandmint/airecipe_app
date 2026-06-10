@@ -181,6 +181,8 @@ export function HomePage({
         preferences.defaultServings,
         language,
         preferences.avoidedIngredients,
+        undefined,
+        preferences.recipeModel,
       )
 
       if (result.recipes.length) {

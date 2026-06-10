@@ -110,7 +110,17 @@ function logGeminiModelEvent(event, details = {}) {
     .map(([key, value]) => `${key}=${value}`)
     .join(' ')
 
-  console.info(`[node] Gemini ${event}${detailText ? ` ${detailText}` : ''}`)
+  const message = `[node] Gemini ${event}${detailText ? ` ${detailText}` : ''}`
+
+  if (
+    event === 'failed' ||
+    event === 'retry-failed' ||
+    event === 'retry-without-responseMimeType'
+  ) {
+    console.warn(message)
+  } else {
+    console.info(message)
+  }
 }
 
 function createRateLimitError(attemptedModels, skippedModels, errors) {

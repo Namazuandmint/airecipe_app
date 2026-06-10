@@ -11,6 +11,7 @@ import {
   getGeminiUsageSnapshot,
 } from './gemini.js'
 import {
+  AuthError,
   createSessionFromTokens,
   createGoogleLoginUrl,
   ensurePublicUser,
@@ -158,6 +159,40 @@ function getRequestOrigin(request, requestedOrigin) {
   return null
 }
 
+// Whitelist redirect targets to prevent open-redirect attacks.
+// Accepts: missing/null, relative paths (/foo, foo/bar), or absolute URLs
+// whose origin matches the current request origin.
+function resolveSafeRedirect(request, redirectTo) {
+  const requestOrigin = getRequestOrigin(request, null)
+
+  if (!redirectTo) {
+    return requestOrigin
+  }
+
+  if (typeof redirectTo !== 'string') {
+    return requestOrigin
+  }
+
+  if (redirectTo.startsWith('/') && !redirectTo.startsWith('//')) {
+    return redirectTo
+  }
+
+  try {
+    const parsed = new URL(redirectTo)
+
+    if (requestOrigin) {
+      const targetOrigin = `${parsed.protocol}//${parsed.host}`.replace(/\/$/, '')
+      if (targetOrigin === requestOrigin) {
+        return redirectTo
+      }
+    }
+  } catch {
+    // Fall through to request origin.
+  }
+
+  return requestOrigin
+}
+
 async function requireAuthenticatedUser(request) {
   const cookies = parseCookies(request.headers.cookie ?? '')
   const accessToken = cookies[authAccessCookieName]
@@ -175,19 +210,23 @@ async function requireAuthenticatedUser(request) {
           session: null,
         }
       }
-    } catch {
-      // Try the refresh token below before treating the request as anonymous.
+    } catch (error) {
+      // Only treat access-token errors as transient. Re-throw infrastructure
+      // failures (Supabase down, etc.) so the handler returns 5xx, not 401.
+      if (!(error instanceof AuthError)) {
+        throw error
+      }
     }
   }
 
   if (!refreshToken) {
-    throw new Error('Login is required')
+    throw new AuthError()
   }
 
   const result = await refreshSessionFromRefreshToken(refreshToken)
 
   if (!result.user?.id) {
-    throw new Error('Login is required')
+    throw new AuthError()
   }
 
   return {
@@ -292,10 +331,21 @@ export async function handleApiRequest(request, response) {
         authResult.session,
       )
     }
-  } catch {
-    sendJson(response, 401, {
+  } catch (error) {
+    if (error instanceof AuthError) {
+      sendJson(response, 401, {
+        ok: false,
+        message: 'Login is required',
+      })
+      return
+    }
+
+    sendJson(response, 500, {
       ok: false,
-      message: 'Login is required',
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Internal server error',
     })
     return
   }
@@ -315,8 +365,12 @@ export async function handleApiRequest(request, response) {
     return
   }
 
-  if (request.method === 'DELETE' && url.pathname === '/api/inventory') {
-    await handleInventoryDelete(request, response, authUser.id)
+  const inventoryDeleteMatch =
+    request.method === 'DELETE' &&
+    url.pathname.match(/^\/api\/inventory\/(\d+)$/)
+  if (inventoryDeleteMatch) {
+    const inventoryId = Number(inventoryDeleteMatch[1])
+    await handleInventoryDelete(request, response, authUser.id, inventoryId)
     return
   }
 
@@ -562,8 +616,7 @@ async function handleAuthRegister(request, response) {
 async function handleAuthGoogle(request, response) {
   try {
     const body = await readJsonBody(request)
-    const redirectTo =
-      getRequestOrigin(request, body?.redirectTo) ?? body?.redirectTo
+    const redirectTo = resolveSafeRedirect(request, body?.redirectTo)
     const result = await createGoogleLoginUrl({
       redirectTo,
     })
@@ -624,10 +677,21 @@ async function handleAuthMe(request, response) {
       ok: true,
       user: authResult.user,
     })
-  } catch {
-    sendJson(response, 401, {
+  } catch (error) {
+    if (error instanceof AuthError) {
+      sendJson(response, 401, {
+        ok: false,
+        message: 'Login is required',
+      })
+      return
+    }
+
+    sendJson(response, 500, {
       ok: false,
-      message: 'Login is required',
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Internal server error',
     })
   }
 }
@@ -657,7 +721,7 @@ async function handleAuthPasswordReset(request, response) {
 
     const result = await sendPasswordResetEmail({
       email: body.email,
-      redirectTo: getRequestOrigin(request, body?.redirectTo) ?? body?.redirectTo,
+      redirectTo: resolveSafeRedirect(request, body?.redirectTo),
     })
 
     sendJson(response, 200, {
@@ -789,12 +853,11 @@ async function handleInventoryUpdate(request, response, userId) {
   }
 }
 
-async function handleInventoryDelete(request, response, userId) {
+async function handleInventoryDelete(request, response, userId, inventoryId) {
   try {
-    const body = await readJsonBody(request)
     const result = await deleteInventoryItemForUser({
       userId,
-      inventoryId: body?.inventoryId,
+      inventoryId,
     })
 
     sendJson(response, 200, {
@@ -931,6 +994,7 @@ async function handleRecipeGeneration(request, response, userId) {
       language: body?.language,
       avoidedIngredients: body?.avoidedIngredients,
       cookingRequest: body?.cookingRequest,
+      modelChoice: body?.model,
     })
 
     sendJson(response, 200, {

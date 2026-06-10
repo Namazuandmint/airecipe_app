@@ -1,0 +1,92 @@
+export type ApiSuccess<T> = { ok: true } & T
+export type ApiFailure = { ok: false; message?: string }
+export type ApiResponse<T> = ApiSuccess<T> | ApiFailure
+
+export class ApiError extends Error {
+  constructor(message: string, public readonly status: number) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+export async function readJson<T>(response: Response): Promise<T> {
+  const responseText = await response.text()
+  let payload: ApiResponse<T>
+
+  try {
+    payload = responseText
+      ? (JSON.parse(responseText) as ApiResponse<T>)
+      : ({ ok: false, message: response.statusText } as ApiFailure)
+  } catch {
+    throw new ApiError(
+      responseText
+        ? `API response was not JSON: ${responseText.slice(0, 120)}`
+        : responseText || response.statusText,
+      response.status,
+    )
+  }
+
+  if (!response.ok || !payload.ok) {
+    const message =
+      'message' in payload && payload.message
+        ? payload.message
+        : response.statusText
+    throw new ApiError(message, response.status)
+  }
+
+  return payload as T
+}
+
+export async function postJson<T>(
+  path: string,
+  body: unknown,
+  options: { credentials?: RequestCredentials } = {},
+): Promise<T> {
+  const response = await fetch(path, {
+    method: 'POST',
+    credentials: options.credentials ?? 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  return readJson<T>(response)
+}
+
+export async function patchJson<T>(
+  path: string,
+  body: unknown,
+  options: { credentials?: RequestCredentials } = {},
+): Promise<T> {
+  const response = await fetch(path, {
+    method: 'PATCH',
+    credentials: options.credentials ?? 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+  return readJson<T>(response)
+}
+
+export async function getJson<T>(
+  path: string,
+  options: { credentials?: RequestCredentials; cache?: RequestCache } = {},
+): Promise<T> {
+  const response = await fetch(path, {
+    credentials: options.credentials ?? 'same-origin',
+    cache: options.cache ?? 'no-store',
+  })
+  return readJson<T>(response)
+}
+
+export async function deleteJson<T>(
+  path: string,
+  options: { credentials?: RequestCredentials } = {},
+): Promise<T> {
+  const response = await fetch(path, {
+    method: 'DELETE',
+    credentials: options.credentials ?? 'same-origin',
+  })
+  return readJson<T>(response)
+}

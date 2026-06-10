@@ -11,6 +11,8 @@ import {
 import type { AuthUser } from '../lib/authApi'
 import type { AppDestination, UserPreferences } from '../types/ui'
 
+type PreferencesFeedbackArea = 'ai' | 'preferences'
+
 type SettingsPageProps = {
   user: AuthUser
   onNavigate?: (page: AppDestination) => void
@@ -30,6 +32,8 @@ export function SettingsPage({
   const [isSavingPreferences, setIsSavingPreferences] = useState(false)
   const [preferencesMessage, setPreferencesMessage] = useState('')
   const [preferencesError, setPreferencesError] = useState('')
+  const [preferencesFeedbackArea, setPreferencesFeedbackArea] =
+    useState<PreferencesFeedbackArea>('preferences')
   const currentLanguage = useMemo(
     () =>
       supportedLanguages.find((item) => item.code === language) ??
@@ -92,8 +96,12 @@ export function SettingsPage({
     setPreferencesError('')
   }
 
-  async function handlePreferencesSubmit(event: FormEvent) {
+  async function handlePreferencesSubmit(
+    event: FormEvent,
+    feedbackArea: PreferencesFeedbackArea,
+  ) {
     event.preventDefault()
+    setPreferencesFeedbackArea(feedbackArea)
     setIsSavingPreferences(true)
     setPreferencesMessage('')
     setPreferencesError('')
@@ -147,51 +155,74 @@ export function SettingsPage({
         </div>
 
         <section className="settings-grid" aria-label={t('settings.title')}>
-          <article className="panel settings-section">
+          <form
+            className="panel settings-section settings-preferences-form settings-ai-card"
+            onSubmit={(event) => handlePreferencesSubmit(event, 'ai')}
+          >
             <div className="section-heading">
               <div>
-                <p className="eyebrow">{t('settings.signedIn')}</p>
-                <h2>{t('settings.accountTitle')}</h2>
+                <p className="eyebrow">AI</p>
+                <h2>{t('settings.recipeModelTitle')}</h2>
               </div>
             </div>
             <p className="settings-section__description">
-              {t('settings.accountDescription')}
+              {t('settings.recipeModelDescription')}
             </p>
-            <dl className="settings-list">
-              <div>
-                <dt>{t('settings.email')}</dt>
-                <dd>{user.email ?? '-'}</dd>
-              </div>
-              <div>
-                <dt>{t('settings.userId')}</dt>
-                <dd className="settings-mono">{user.id}</dd>
-              </div>
-              <div>
-                <dt>{t('settings.authStatus')}</dt>
-                <dd>
-                  <span className="status-pill">{t('settings.signedIn')}</span>
-                </dd>
-              </div>
-              {user.isAdmin ? (
-                <div>
-                  <dt>{t('settings.adminStatus')}</dt>
-                  <dd>
-                    <span className="status-pill">{t('settings.adminUser')}</span>
-                  </dd>
-                </div>
-              ) : null}
-            </dl>
-            {user.isAdmin ? (
-              <button
-                type="button"
-                className="secondary-button settings-admin-button"
-                onClick={() => onNavigate?.('admin')}
-              >
-                <Icon name="message" />
-                <span>{t('settings.openAdminConsole')}</span>
-              </button>
+
+            {preferencesError && preferencesFeedbackArea === 'ai' ? (
+              <p className="status-message" role="alert">
+                {preferencesError === 'settings.preferencesLoadFailed'
+                  ? t('settings.preferencesLoadFailed')
+                  : preferencesError}
+              </p>
             ) : null}
-          </article>
+
+            {preferencesMessage && preferencesFeedbackArea === 'ai' ? (
+              <p className="status-message" role="status">
+                {preferencesMessage}
+              </p>
+            ) : null}
+
+            <fieldset className="settings-fieldset settings-fieldset--plain">
+              <legend>{t('settings.recipeModelTitle')}</legend>
+              <div className="language-options" role="radiogroup">
+                {(['gemini', 'groq'] as const).map((modelOption) => (
+                  <button
+                    key={modelOption}
+                    type="button"
+                    className={`language-option ${
+                      preferences.recipeModel === modelOption ? 'is-active' : ''
+                    }`}
+                    role="radio"
+                    aria-checked={preferences.recipeModel === modelOption}
+                    disabled={isLoadingPreferences || isSavingPreferences}
+                    onClick={() => updatePreference('recipeModel', modelOption)}
+                  >
+                    <strong>
+                      {modelOption === 'gemini'
+                        ? t('settings.recipeModelGemini')
+                        : t('settings.recipeModelGpt')}
+                    </strong>
+                    <span>
+                      {modelOption === 'gemini'
+                        ? t('settings.recipeModelGeminiNote')
+                        : t('settings.recipeModelGptNote')}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <button
+              type="submit"
+              className="primary-button settings-save-button"
+              disabled={isLoadingPreferences || isSavingPreferences}
+            >
+              {isSavingPreferences
+                ? t('settings.savingPreferences')
+                : t('settings.savePreferences')}
+            </button>
+          </form>
 
           <article className="panel settings-section">
             <div className="section-heading">
@@ -227,7 +258,7 @@ export function SettingsPage({
 
           <form
             className="panel settings-section settings-preferences-form"
-            onSubmit={handlePreferencesSubmit}
+            onSubmit={(event) => handlePreferencesSubmit(event, 'preferences')}
           >
             <div className="section-heading">
               <div>
@@ -239,7 +270,7 @@ export function SettingsPage({
               {t('settings.preferencesDescription')}
             </p>
 
-            {preferencesError ? (
+            {preferencesError && preferencesFeedbackArea === 'preferences' ? (
               <p className="status-message" role="alert">
                 {preferencesError === 'settings.preferencesLoadFailed'
                   ? t('settings.preferencesLoadFailed')
@@ -247,7 +278,7 @@ export function SettingsPage({
               </p>
             ) : null}
 
-            {preferencesMessage ? (
+            {preferencesMessage && preferencesFeedbackArea === 'preferences' ? (
               <p className="status-message" role="status">
                 {preferencesMessage}
               </p>
@@ -354,16 +385,50 @@ export function SettingsPage({
             </button>
           </form>
 
-          <article className="panel settings-section">
+          <article className="panel settings-section settings-account-card">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">{t('common.logout')}</p>
-                <h2>{t('settings.dataSecurityTitle')}</h2>
+                <p className="eyebrow">{t('settings.signedIn')}</p>
+                <h2>{t('settings.accountTitle')}</h2>
               </div>
             </div>
             <p className="settings-section__description">
-              {t('settings.dataSecurityDescription')}
+              {t('settings.accountDescription')}
             </p>
+            <dl className="settings-list">
+              <div>
+                <dt>{t('settings.email')}</dt>
+                <dd>{user.email ?? '-'}</dd>
+              </div>
+              <div>
+                <dt>{t('settings.userId')}</dt>
+                <dd className="settings-mono">{user.id}</dd>
+              </div>
+              <div>
+                <dt>{t('settings.authStatus')}</dt>
+                <dd>
+                  <span className="status-pill">{t('settings.signedIn')}</span>
+                </dd>
+              </div>
+              {user.isAdmin ? (
+                <div>
+                  <dt>{t('settings.adminStatus')}</dt>
+                  <dd>
+                    <span className="status-pill">{t('settings.adminUser')}</span>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+            {user.isAdmin ? (
+              <button
+                type="button"
+                className="secondary-button settings-admin-button"
+                onClick={() => onNavigate?.('admin')}
+              >
+                <Icon name="message" />
+                <span>{t('settings.openAdminConsole')}</span>
+              </button>
+            ) : null}
             <div className="settings-session-row">
               <div>
                 <strong>{t('settings.logoutTitle')}</strong>

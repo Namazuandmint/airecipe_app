@@ -87,6 +87,14 @@ function normalizeUser(user) {
   }
 }
 
+export class AuthError extends Error {
+  constructor(message = 'Login is required', statusCode = 401) {
+    super(message)
+    this.name = 'AuthError'
+    this.statusCode = statusCode
+  }
+}
+
 function getFallbackEmail(userId) {
   return `user-${userId}@aicook.local`
 }
@@ -151,7 +159,9 @@ function normalizeSession(session) {
   }
 }
 
-function decodeJwtPayload(accessToken) {
+// Reads the JWT payload without verifying the signature. Only used to
+// extract `exp` for cookie max-age. Do not use for any trust decision.
+function decodeJwtPayloadForExpiration(accessToken) {
   const [, payload] = String(accessToken).split('.')
 
   if (!payload) {
@@ -254,7 +264,7 @@ export async function createSessionFromTokens({ accessToken, refreshToken }) {
   }
 
   const user = await ensurePublicUser(await getUserFromAccessToken(accessToken))
-  const payload = decodeJwtPayload(accessToken)
+  const payload = decodeJwtPayloadForExpiration(accessToken)
   const timeNow = Math.floor(Date.now() / 1000)
   const expiresAt = Number.isFinite(payload.exp) ? payload.exp : null
   const expiresIn = expiresAt ? Math.max(0, expiresAt - timeNow) : null
@@ -338,13 +348,13 @@ export async function getUserFromAccessToken(accessToken) {
   const client = requireAuthVerifierClient()
 
   if (!accessToken) {
-    throw new Error('access token is required')
+    throw new AuthError('access token is required')
   }
 
   const { data, error } = await client.auth.getUser(accessToken)
 
   if (error) {
-    throw new Error(error.message)
+    throw new AuthError(error.message)
   }
 
   return normalizeUser(data.user)

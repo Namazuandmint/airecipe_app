@@ -1,4 +1,5 @@
 import { createGroqChatCompletion, defaultGroqModel } from './groq.js'
+import { generateGeminiContent } from './gemini.js'
 import { isSupabaseServiceRoleConfigured, supabase } from './supabase.js'
 
 const demoUserId = process.env.AI_RECIPE_DEMO_USER_ID
@@ -700,6 +701,7 @@ export async function generateAndSaveRecipes({
   language = 'ja',
   avoidedIngredients = '',
   cookingRequest = '',
+  modelChoice = 'groq',
 }) {
   const normalizedLanguage = normalizeLanguage(language)
   const avoidedIngredientList = normalizeAvoidedIngredients(avoidedIngredients)
@@ -715,41 +717,20 @@ export async function generateAndSaveRecipes({
     throw error
   }
 
-  const completion = await createGroqChatCompletion({
-    model: defaultGroqModel,
-    messages: [
-      {
-        role: 'system',
-        content: text.assistant,
-      },
-      {
-        role: 'user',
-        content: buildRecipePrompt(
-          inventory,
-          servings,
-          normalizedLanguage,
-          avoidedIngredientList,
-          cookingRequest,
-        ),
-      },
-    ],
-    temperature: 0.85,
-    top_p: 0.9,
-    frequency_penalty: 0.25,
-    presence_penalty: 0.2,
-    max_tokens: 2500,
-    response_format: {
-      type: 'json_object',
-    },
-  })
+  const userPrompt = buildRecipePrompt(
+    inventory,
+    servings,
+    normalizedLanguage,
+    avoidedIngredientList,
+    cookingRequest,
+  )
 
-  const content = completion?.choices?.[0]?.message?.content
+  const recipesJson =
+    modelChoice === 'gemini'
+      ? await requestRecipeJsonFromGemini(text.assistant, userPrompt)
+      : await requestRecipeJsonFromGroq(text.assistant, userPrompt)
 
-  if (!content) {
-    throw new Error('Groq response was empty')
-  }
-
-  const recipes = toRecipeRows(parseJsonFromModel(content))
+  const recipes = toRecipeRows(recipesJson)
   const ingredientById = new Map(
     inventory.map((item) => [Number(item.ingredientId), item]),
   )
@@ -811,6 +792,49 @@ export async function generateAndSaveRecipes({
   }
 }
 
+async function requestRecipeJsonFromGroq(systemPrompt, userPrompt) {
+  const completion = await createGroqChatCompletion({
+    model: defaultGroqModel,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+    temperature: 0.85,
+    top_p: 0.9,
+    frequency_penalty: 0.25,
+    presence_penalty: 0.2,
+    max_tokens: 2500,
+    response_format: { type: 'json_object' },
+  })
+
+  const content = completion?.choices?.[0]?.message?.content
+
+  if (!content) {
+    throw new Error('Groq response was empty')
+  }
+
+  return parseJsonFromModel(content)
+}
+
+async function requestRecipeJsonFromGemini(systemPrompt, userPrompt) {
+  // Gemini's generateContent API takes a single prompt, so concatenate the
+  // system instruction and user prompt. The backend will rotate across the
+  // configured model queue (gemini-3.1-flash-lite → 2.5-flash-lite → ...) for
+  // rate-limit protection.
+  const combinedPrompt = `${systemPrompt}\n\n${userPrompt}`
+
+  const result = await generateGeminiContent({
+    prompt: combinedPrompt,
+    responseMimeType: 'application/json',
+  })
+
+  if (!result.text) {
+    throw new Error('Gemini response was empty')
+  }
+
+  return parseJsonFromModel(result.text)
+}
+
 function unitUsesGram(unit) {
   const normalized = unit.trim().toLowerCase()
   return ['g', 'gram', 'grams', 'グラム', 'ml', 'ミリリットル'].includes(
@@ -821,7 +845,7 @@ function unitUsesGram(unit) {
 async function reduceInventoryAmount({ userId, ingredientId, amount, unit }) {
   const client = ensureSupabase()
   const column = unitUsesGram(unit) ? 'gram' : 'quantity'
-  let remaining = column === 'quantity' ? Math.ceil(amount) : Math.ceil(amount)
+  const totalToDeduct = Math.ceil(amount)
   const deductions = []
 
   const { data: rows, error } = await client
@@ -840,53 +864,61 @@ async function reduceInventoryAmount({ userId, ingredientId, amount, unit }) {
     0,
   )
 
-  if (available < remaining) {
-    const shortage = remaining - available
-    const error = new Error(
+  if (available < totalToDeduct) {
+    const shortage = totalToDeduct - available
+    const err = new Error(
       `在庫が不足しています: ingredient_id=${ingredientId} ${shortage}${unit}`,
     )
-    error.statusCode = 400
-    throw error
+    err.statusCode = 400
+    throw err
   }
 
+  // NOTE: a true atomic deduction would be best implemented as a Postgres
+  // RPC that locks the rows in `inventory` and returns the deducted rows.
+  // For now, we plan the deductions client-side and execute them in parallel.
+  let remaining = totalToDeduct
+  const updates = []
+
   for (const row of rows ?? []) {
-    if (remaining <= 0) {
-      break
-    }
-
+    if (remaining <= 0) break
     const currentAmount = Number(row[column] ?? 0)
-
-    if (currentAmount <= 0) {
-      continue
-    }
+    if (currentAmount <= 0) continue
 
     const deduction = Math.min(currentAmount, remaining)
     const nextAmount = currentAmount - deduction
-    const { error: updateError } = await client
-      .from('inventory')
-      .update({ [column]: nextAmount })
-      .eq('inventory_id', row.inventory_id)
-
-    if (updateError) {
-      throw new Error(`Failed to update inventory: ${updateError.message}`)
-    }
-
-    deductions.push({
-      inventoryId: row.inventory_id,
-      ingredientId,
-      column,
-      used: deduction,
-      remaining: nextAmount,
-    })
     remaining -= deduction
+    updates.push({ row, deduction, nextAmount })
   }
+
+  const results = await Promise.all(
+    updates.map(async ({ row, deduction, nextAmount }) => {
+      const { error: updateError } = await client
+        .from('inventory')
+        .update({ [column]: nextAmount })
+        .eq('inventory_id', row.inventory_id)
+
+      if (updateError) {
+        throw new Error(`Failed to update inventory: ${updateError.message}`)
+      }
+
+      return {
+        inventoryId: row.inventory_id,
+        ingredientId,
+        column,
+        used: deduction,
+        remaining: nextAmount,
+      }
+    }),
+  )
+
+  deductions.push(...results)
 
   return {
     ingredientId,
     requested: amount,
     unit,
     column,
-    deducted: amount - Math.max(remaining, 0),
+    deducted: totalToDeduct - Math.max(remaining, 0),
     shortage: Math.max(remaining, 0),
     deductions,
   }

@@ -98,9 +98,12 @@ export type ReceiptIngredientCandidate = {
   sourceLine?: string | null
 }
 
+export type RecipeModelChoice = 'gemini' | 'groq'
+
 export type UserPreferences = {
   defaultServings: number
   avoidedIngredients: string
+  recipeModel: RecipeModelChoice
   notifications: {
     expiration: boolean
     lowStock: boolean

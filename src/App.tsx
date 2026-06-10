@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type MutableRefObject } from 'react'
 import './lib/supabase'
 import './lib/groq'
 import './lib/gemini'
@@ -31,10 +31,10 @@ import type { AppDestination, Recipe, ReceiptIngredientCandidate } from './types
 
 type Page = AppDestination | 'recipe' | 'receipt-detail'
 
-let oauthSessionRequest: {
+type OAuthSessionRequest = {
   key: string
   promise: ReturnType<typeof createSessionFromOAuthTokens>
-} | null = null
+}
 
 function getPageFromPath(): AppDestination {
   if (window.location.pathname === '/fridge') {
@@ -133,20 +133,20 @@ function readOAuthTokensFromHash() {
   }
 }
 
-function createOAuthSessionOnce(tokens: {
-  accessToken: string
-  refreshToken: string
-}) {
+function createOAuthSessionOnce(
+  ref: MutableRefObject<OAuthSessionRequest | null>,
+  tokens: { accessToken: string; refreshToken: string },
+) {
   const key = `${tokens.accessToken}:${tokens.refreshToken}`
 
-  if (!oauthSessionRequest || oauthSessionRequest.key !== key) {
-    oauthSessionRequest = {
+  if (!ref.current || ref.current.key !== key) {
+    ref.current = {
       key,
       promise: createSessionFromOAuthTokens(tokens),
     }
   }
 
-  return oauthSessionRequest.promise
+  return ref.current.promise
 }
 
 function namesToReceiptCandidates(names: string[]): ReceiptIngredientCandidate[] {
@@ -173,6 +173,7 @@ function App() {
     useState<AppDestination>('receipt')
   const [passwordResetTokens, setPasswordResetTokens] =
     useState<AuthTokenPair | null>(null)
+  const oauthSessionRequestRef = useRef<OAuthSessionRequest | null>(null)
 
   useEffect(() => {
     let isMounted = true
@@ -197,7 +198,10 @@ function App() {
             return
           }
 
-          const result = await createOAuthSessionOnce(oauthTokens)
+          const result = await createOAuthSessionOnce(
+            oauthSessionRequestRef,
+            oauthTokens,
+          )
 
           if (!isMounted) {
             return

@@ -1,36 +1,62 @@
 import { spawn } from 'node:child_process'
-import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
+const isWindows = process.platform === 'win32'
 const viteBin = resolve('node_modules', 'vite', 'bin', 'vite.js')
 const apiPort = Number(process.env.PORT ?? 8787)
 const vitePort = 3000
 
-function getListeningPids(port) {
+function runProcess(command, args) {
   try {
-    return execFileSync('lsof', [
-      '-tiTCP:' + String(port),
-      '-sTCP:LISTEN',
-      '-n',
-      '-P',
-    ], {
-      encoding: 'utf8',
-    })
-      .split(/\s+/)
-      .filter(Boolean)
-  } catch {
-    return []
-  }
-}
-
-function getCommand(pid) {
-  try {
-    return execFileSync('ps', ['-p', pid, '-o', 'command='], {
-      encoding: 'utf8',
-    }).trim()
+    const { execFileSync } = require('node:child_process')
+    return execFileSync(command, args, { encoding: 'utf8' })
   } catch {
     return ''
   }
+}
+
+function getListeningPids(port) {
+  if (isWindows) {
+    const output = runProcess('netstat', ['-ano', '-p', 'TCP'])
+    if (!output) return []
+    const lines = output.split(/\r?\n/)
+    const pids = new Set()
+    for (const line of lines) {
+      const trimmed = line.trim()
+      const match = trimmed.match(
+        new RegExp(`^TCP\\s+[^\\s]+\\:${port}\\s+[^\\s]+\\s+LISTENING\\s+(\\d+)$`),
+      )
+      if (match) {
+        pids.add(match[1])
+      }
+    }
+    return Array.from(pids)
+  }
+
+  return runProcess('lsof', [
+    '-tiTCP:' + String(port),
+    '-sTCP:LISTEN',
+    '-n',
+    '-P',
+  ])
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+function getCommand(pid) {
+  if (isWindows) {
+    const output = runProcess('wmic', [
+      'process',
+      'where',
+      `ProcessId=${pid}`,
+      'get',
+      'CommandLine',
+      '/value',
+    ])
+    return output.replace(/^CommandLine=/, '').trim()
+  }
+
+  return runProcess('ps', ['-p', pid, '-o', 'command=']).trim()
 }
 
 function releaseStalePort(port, expectedCommandPart, label) {
@@ -39,7 +65,9 @@ function releaseStalePort(port, expectedCommandPart, label) {
 
     if (!command.includes(expectedCommandPart)) {
       console.error(
-        `[node] Port ${port} is already used by another process: ${command || pid}`,
+        `[node] Port ${port} is already used by another process: ${
+          command || pid
+        }`,
       )
       process.exit(1)
     }

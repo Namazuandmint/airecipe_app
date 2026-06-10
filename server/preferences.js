@@ -5,11 +5,18 @@ const metadataKey = 'ai_recipe_preferences'
 export const defaultUserPreferences = {
   defaultServings: 2,
   avoidedIngredients: '',
+  recipeModel: 'groq',
   notifications: {
     expiration: true,
     lowStock: false,
     expirationLeadDays: 3,
   },
+}
+
+const allowedRecipeModels = new Set(['gemini', 'groq'])
+
+function sanitizeRecipeModel(value) {
+  return allowedRecipeModels.has(value) ? value : defaultUserPreferences.recipeModel
 }
 
 function ensureSupabaseAdmin() {
@@ -57,6 +64,7 @@ export function sanitizeUserPreferences(value) {
       typeof source.avoidedIngredients === 'string'
         ? source.avoidedIngredients.slice(0, 1000)
         : '',
+    recipeModel: sanitizeRecipeModel(source.recipeModel),
     notifications: {
       expiration: notifications.expiration !== false,
       lowStock: notifications.lowStock === true,

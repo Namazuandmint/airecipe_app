@@ -151,7 +151,7 @@ function getNearestDate(values: Array<string | null | undefined>) {
   return validDates[0] ?? null
 }
 
-function compareCategoryNames(left: string, right: string) {
+function compareCategoryNames(left: string, right: string, language: string) {
     if (left === 'その他' && right !== 'その他') {
       return 1
     }
@@ -160,14 +160,19 @@ function compareCategoryNames(left: string, right: string) {
       return -1
     }
 
-    return left.localeCompare(right, 'ja')
+    return left.localeCompare(right, language)
 }
 
-function sortCategoryNames(categories: string[]) {
-  return categories.toSorted(compareCategoryNames)
+function sortCategoryNames(categories: string[], language: string) {
+  return categories.toSorted((left, right) =>
+    compareCategoryNames(left, right, language),
+  )
 }
 
-function aggregateIngredients(ingredients: Ingredient[]): AggregatedIngredient[] {
+function aggregateIngredients(
+  ingredients: Ingredient[],
+  language: string,
+): AggregatedIngredient[] {
   const groups = new Map<string, Ingredient[]>()
 
   for (const ingredient of ingredients) {
@@ -199,7 +204,7 @@ function aggregateIngredients(ingredients: Ingredient[]): AggregatedIngredient[]
         items,
       } satisfies AggregatedIngredient
     })
-    .toSorted((left, right) => left.name.localeCompare(right.name, 'ja'))
+    .toSorted((left, right) => left.name.localeCompare(right.name, language))
 }
 
 function buildSummary(ingredients: Ingredient[]): Summary {
@@ -266,8 +271,8 @@ export function FridgePage({
   const [formError, setFormError] = useState('')
   const summary = useMemo(() => buildSummary(ingredients), [ingredients])
   const aggregatedIngredients = useMemo(
-    () => aggregateIngredients(ingredients),
-    [ingredients],
+    () => aggregateIngredients(ingredients, language),
+    [ingredients, language],
   )
   const groupedIngredients = useMemo(
     () =>
@@ -284,10 +289,10 @@ export function FridgePage({
   )
   const sortedCategoryEntries = useMemo(
     () =>
-      sortCategoryNames(Object.keys(groupedIngredients)).map(
+      sortCategoryNames(Object.keys(groupedIngredients), language).map(
         (category) => [category, groupedIngredients[category]] as const,
       ),
-    [groupedIngredients],
+    [groupedIngredients, language],
   )
   const formCategories = useMemo(
     () =>
@@ -302,12 +307,15 @@ export function FridgePage({
             .map((item) => item.category?.trim())
             .filter((category): category is string => Boolean(category)),
         ]),
-      ).toSorted(compareCategoryNames),
-    [ingredients],
+      ).toSorted((left, right) => compareCategoryNames(left, right, language)),
+    [ingredients, language],
   )
   const categories = useMemo(
-    () => [allCategoryKey, ...sortCategoryNames(Object.keys(groupedIngredients))],
-    [groupedIngredients],
+    () => [
+      allCategoryKey,
+      ...sortCategoryNames(Object.keys(groupedIngredients), language),
+    ],
+    [groupedIngredients, language],
   )
   const allInventoryIds = useMemo(
     () => getInventoryIds(ingredients),
@@ -419,7 +427,7 @@ export function FridgePage({
       setIngredients(result.inventory)
       setDetailIngredient((current) =>
         current
-          ? aggregateIngredients(result.inventory).find(
+          ? aggregateIngredients(result.inventory, language).find(
               (item) => item.key === current.key,
             ) ?? null
           : null,
@@ -498,7 +506,7 @@ export function FridgePage({
       setIngredients(latestInventory)
       setDetailIngredient((current) =>
         current
-          ? aggregateIngredients(latestInventory).find(
+          ? aggregateIngredients(latestInventory, language).find(
               (item) => item.key === current.key,
             ) ?? null
           : null,

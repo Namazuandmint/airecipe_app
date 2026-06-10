@@ -1,4 +1,5 @@
 import { generateGeminiContent } from './geminiApi'
+import { ApiError, getJson } from './apiClient'
 
 declare global {
   interface Window {
@@ -8,21 +9,7 @@ declare global {
 }
 
 async function fetchGeminiUsage() {
-  const response = await fetch('/api/gemini/usage', {
-    credentials: 'same-origin',
-    cache: 'no-store',
-  })
-  const payload = (await response.json()) as {
-    ok?: boolean
-    message?: string
-    usage?: unknown
-  }
-
-  if (!response.ok || !payload.ok) {
-    throw new Error(payload.message ?? response.statusText)
-  }
-
-  return payload.usage
+  return getJson<{ usage?: unknown }>('/api/gemini/usage')
 }
 
 export async function testGeminiConnection(prompt: string) {
@@ -53,7 +40,13 @@ export async function testGeminiConnection(prompt: string) {
       console.table(result.usage)
     }
   } catch (error) {
-    console.error('[vite] Gemini test failed:', error)
+    const message =
+      error instanceof ApiError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : 'unknown error'
+    console.error('[vite] Gemini test failed:', message)
 
     try {
       console.info('[vite] Gemini usage after failure:', await fetchGeminiUsage())
@@ -65,13 +58,15 @@ export async function testGeminiConnection(prompt: string) {
 
 export async function logGeminiUsage() {
   try {
-    console.info('[vite] Gemini usage:', await fetchGeminiUsage())
+    console.info('[vite] Gemini usage:', (await fetchGeminiUsage()).usage)
   } catch (error) {
     console.error('[vite] Gemini usage fetch failed:', error)
   }
 }
 
-window.testGemini = testGeminiConnection
-window.geminiUsage = logGeminiUsage
-console.info('[vite] Gemini test ready: run window.testGemini("your prompt")')
-console.info('[vite] Gemini usage ready: run window.geminiUsage()')
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  window.testGemini = testGeminiConnection
+  window.geminiUsage = logGeminiUsage
+  console.info('[vite] Gemini test ready: run window.testGemini("your prompt")')
+  console.info('[vite] Gemini usage ready: run window.geminiUsage()')
+}
