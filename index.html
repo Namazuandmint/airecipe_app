@@ -9,31 +9,6 @@
   </head>
   <body>
     <div id="root"></div>
-
-    <script type="module">
-      const resetVersion = 'aicook-reset-d28bc76-v3'
-      const params = new URLSearchParams(window.location.search)
-
-      if (params.get('reset') !== resetVersion) {
-        try {
-          localStorage.clear()
-          sessionStorage.clear()
-
-          if ('serviceWorker' in navigator) {
-            const registrations = await navigator.serviceWorker.getRegistrations()
-            await Promise.all(registrations.map((registration) => registration.unregister()))
-          }
-
-          if ('caches' in window) {
-            const keys = await caches.keys()
-            await Promise.all(keys.map((key) => caches.delete(key)))
-          }
-        } finally {
-          window.location.replace(`${window.location.pathname}?reset=${resetVersion}&t=${Date.now()}`)
-        }
-      } else {
-        await import('/src/main.tsx?build=d28bc76-v3')
-      }
-    </script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
