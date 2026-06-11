@@ -523,7 +523,6 @@ function App() {
         <SettingsPage
           user={currentUser}
           onNavigate={handleNavigate}
-          onLogout={handleLogout}
         />
       )
       break

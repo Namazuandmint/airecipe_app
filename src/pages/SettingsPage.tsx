@@ -16,16 +16,13 @@ type PreferencesFeedbackArea = 'ai' | 'preferences' | 'account'
 type SettingsPageProps = {
   user: AuthUser
   onNavigate?: (page: AppDestination) => void
-  onLogout?: () => void | Promise<void>
 }
 
 export function SettingsPage({
   user,
   onNavigate,
-  onLogout,
 }: SettingsPageProps) {
   const { language, setLanguage, t } = useI18n()
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [preferences, setPreferences] =
     useState<UserPreferences>(defaultPreferences)
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true)
@@ -149,15 +146,6 @@ export function SettingsPage({
       )
       setIsSavingPreferences(false)
     }
-  }
-
-  async function handleLogout() {
-    if (!onLogout) {
-      return
-    }
-
-    setIsLoggingOut(true)
-    await onLogout()
   }
 
   return (
@@ -478,22 +466,6 @@ export function SettingsPage({
                 : t('settings.savePreferences')}
             </button>
 
-            <div className="settings-session-row">
-              <div>
-                <strong>{t('settings.logoutTitle')}</strong>
-                <span>{t('settings.logoutDescription')}</span>
-              </div>
-              <button
-                type="button"
-                className="secondary-button danger-button"
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-              >
-                {isLoggingOut
-                  ? t('settings.loggingOut')
-                  : t('settings.logoutButton')}
-              </button>
-            </div>
           </form>
         </section>
       </main>
