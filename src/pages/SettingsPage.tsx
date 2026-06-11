@@ -413,7 +413,6 @@ export function SettingsPage({
             ) : null}
             <fieldset className="settings-fieldset">
               <legend>{t('settings.notifications')}</legend>
-              <p>{t('settings.notificationsDescription')}</p>
 
               <label className="settings-toggle">
                 <input

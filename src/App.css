@@ -1759,6 +1759,17 @@ button:disabled {
   font-weight: 800;
 }
 
+.settings-fieldset legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.settings-fieldset legend + * {
+  clear: both;
+}
+
 .settings-field label span,
 .settings-field>label span,
 .settings-fieldset p {
@@ -1826,10 +1837,19 @@ button:disabled {
 }
 
 .settings-field--inline {
-  grid-template-columns: 1fr 110px;
+  grid-template-columns: minmax(0, 1fr) 110px;
   align-items: center;
   padding: 0;
   background: transparent;
+}
+
+.settings-field--inline > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-field--inline input {
+  min-width: 0;
 }
 
 .settings-save-button {
@@ -2157,6 +2177,10 @@ button:disabled {
 
   .settings-field--inline {
     grid-template-columns: 1fr;
+  }
+
+  .settings-field--inline input {
+    width: min(100%, 160px);
   }
 
   .receipt-source-actions {
