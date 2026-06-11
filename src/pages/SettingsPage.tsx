@@ -268,7 +268,7 @@ export function SettingsPage({
                   onClick={() => setLanguage(item.code)}
                 >
                   <strong>{item.label}</strong>
-                  <span>{item.nativeName}</span>
+                  <span>{item.description}</span>
                 </button>
               ))}
             </div>

@@ -4,9 +4,9 @@ export { enMessages } from './i18n/en'
 export { frMessages } from './i18n/fr'
 
 export const supportedLanguages = [
-  { code: 'ja', label: '日本語', nativeName: '日本語' },
-  { code: 'en', label: 'English', nativeName: 'English' },
-  { code: 'fr', label: 'Français', nativeName: 'Français' },
+  { code: 'ja', label: '日本語', description: '日本語で表示します' },
+  { code: 'en', label: 'English', description: 'Display in English' },
+  { code: 'fr', label: 'Français', description: 'Afficher en français' },
 ] as const
 
 export type LanguageCode = (typeof supportedLanguages)[number]['code']
