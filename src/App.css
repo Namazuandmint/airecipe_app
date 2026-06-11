@@ -172,6 +172,10 @@
   background: var(--surface-soft);
 }
 
+.topbar__nav a.active {
+  border: 1px solid var(--line);
+}
+
 .topbar__actions {
   display: flex;
   align-items: center;

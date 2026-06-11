@@ -11,6 +11,7 @@ import { fetchPreferences, defaultPreferences } from '../lib/preferencesApi'
 import type { AppDestination, Ingredient, UserPreferences } from '../types/ui'
 
 type TopbarProps = {
+  currentPage?: string
   onNavigate?: (page: AppDestination) => void
   onLogout?: () => void | Promise<void>
 }
@@ -106,7 +107,7 @@ function getExpiringInfo(ingredient: Ingredient, leadDays: number) {
   return null
 }
 
-export function Topbar({ onNavigate, onLogout }: TopbarProps) {
+export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
   const { language, t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
@@ -300,6 +301,7 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
 
       <nav className="topbar__nav" aria-label={t('topbar.menuLabel')}>
         <a
+          className={currentPage === 'fridge' ? 'active' : ''}
           href="#ingredients"
           onClick={(event) => {
             event.preventDefault()
@@ -309,6 +311,7 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
           {t('topbar.ingredients')}
         </a>
         <a
+          className={currentPage === 'recipe-generate' ? 'active' : ''}
           href="#recipes"
           onClick={(event) => {
             event.preventDefault()
@@ -318,6 +321,7 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
           {t('topbar.recipes')}
         </a>
         <a
+          className={currentPage === 'ingredient-register' ? 'active' : ''}
           href="#receipt"
           onClick={(event) => {
             event.preventDefault()
@@ -327,6 +331,7 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
           {t('topbar.receipt')}
         </a>
         <a
+          className={currentPage === 'history' ? 'active' : ''}
           href="#history"
           onClick={(event) => {
             event.preventDefault()

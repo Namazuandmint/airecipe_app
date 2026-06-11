@@ -270,6 +270,7 @@ export function FridgePage({
   const toastTimerRef = useRef<number | null>(null)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false)
+  const categoryDropdownRef = useRef<HTMLDivElement | null>(null)
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(
     () => new Set(),
   )
@@ -577,6 +578,39 @@ export function FridgePage({
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (!isCategoryDropdownOpen) {
+      return
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+
+      if (
+        target instanceof Node &&
+        categoryDropdownRef.current?.contains(target)
+      ) {
+        return
+      }
+
+      setIsCategoryDropdownOpen(false)
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsCategoryDropdownOpen(false)
+      }
+    }
+
+    document.addEventListener('pointerdown', handlePointerDown, true)
+    document.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown, true)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isCategoryDropdownOpen])
 
   function openEditForm(ingredient: Ingredient) {
     setFormState(buildFormFromIngredient(ingredient))
@@ -906,7 +940,7 @@ export function FridgePage({
             <div className="fridge-filter-options">
               <fieldset className="fridge-filter-group">
                 <legend>{t('fridge.filter.category')}</legend>
-                <div className="fridge-category-dropdown">
+                <div className="fridge-category-dropdown" ref={categoryDropdownRef}>
                   <button
                     type="button"
                     className="secondary-button fridge-category-dropdown__trigger"
