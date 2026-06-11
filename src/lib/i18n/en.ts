@@ -203,6 +203,8 @@ export const enMessages: Record<MessageKey, string> = {
   'fridge.summary.uniqueNote': 'Ingredient name variations',
   'fridge.summary.nearExpiration': 'Expiring soon',
   'fridge.summary.nearExpirationNote': 'Ingredients expiring within 3 days',
+  'fridge.summary.expired': 'Expired',
+  'fridge.summary.expiredNote': 'Ingredients past expiration',
   'fridge.filter.all': 'All',
   'fridge.empty': 'No ingredients have been registered for this user yet.',
   'fridge.table.ingredient': 'Ingredient',
