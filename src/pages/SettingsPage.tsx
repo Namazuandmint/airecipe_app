@@ -33,6 +33,7 @@ export function SettingsPage({
   const preferencesRef = useRef<UserPreferences>(defaultPreferences)
   const saveTimerRef = useRef<number | null>(null)
   const saveRequestRef = useRef(0)
+  const hasPendingSaveRef = useRef(false)
   const toastTimerRef = useRef<number | null>(null)
   const currentLanguage = useMemo(
     () =>
@@ -93,8 +94,18 @@ export function SettingsPage({
         window.clearTimeout(saveTimerRef.current)
         saveTimerRef.current = null
       }
+      if (hasPendingSaveRef.current) {
+        hasPendingSaveRef.current = false
+        void savePreferences(preferencesRef.current)
+          .then((result) => {
+            setCache(`preferences:${user.id}`, result.preferences)
+          })
+          .catch((error) => {
+            console.warn('[vite] Pending preferences save failed:', error)
+          })
+      }
     }
-  }, [])
+  }, [user.id])
 
   function showToast(message: string) {
     if (toastTimerRef.current !== null) {
@@ -154,16 +165,20 @@ export function SettingsPage({
       window.clearTimeout(saveTimerRef.current)
     }
 
+    const requestId = saveRequestRef.current + 1
+    saveRequestRef.current = requestId
+    hasPendingSaveRef.current = true
     saveTimerRef.current = window.setTimeout(() => {
       saveTimerRef.current = null
-      void persistPreferences(nextPreferences)
+      hasPendingSaveRef.current = false
+      void persistPreferences(nextPreferences, requestId)
     }, 450)
   }
 
-  async function persistPreferences(nextPreferences: UserPreferences) {
-    const requestId = saveRequestRef.current + 1
-    saveRequestRef.current = requestId
-
+  async function persistPreferences(
+    nextPreferences: UserPreferences,
+    requestId: number,
+  ) {
     try {
       const result = await savePreferences(nextPreferences)
 
