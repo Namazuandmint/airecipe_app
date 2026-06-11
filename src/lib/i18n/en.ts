@@ -65,7 +65,7 @@ export const enMessages: Record<MessageKey, string> = {
   'home.hero.showRecipes': 'Show recipes',
   'home.hero.previewAria': 'Recommended meal preview',
   'home.hero.aiSuggestion': 'AI suggestion',
-  'home.hero.previewTitle': 'Japanese-style salmon and komatsuna cream stew',
+  'home.hero.previewTitle': 'salmon and komatsuna cream stew',
   'home.hero.previewDescription':
     'A 25-minute meal that prioritizes ingredients expiring soon.',
   'home.ingredients.eyebrow': 'Inventory',

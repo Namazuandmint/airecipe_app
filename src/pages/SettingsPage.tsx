@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { Icon } from '../components/Icon'
 import { supportedLanguages } from '../lib/i18n'
 import { getCache, setCache } from '../lib/dataCache'
@@ -30,10 +30,11 @@ export function SettingsPage({
     useState<UserPreferences>(defaultPreferences)
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true)
   const [isSavingPreferences, setIsSavingPreferences] = useState(false)
-  const [preferencesMessage, setPreferencesMessage] = useState('')
   const [preferencesError, setPreferencesError] = useState('')
   const [preferencesFeedbackArea, setPreferencesFeedbackArea] =
     useState<PreferencesFeedbackArea>('preferences')
+  const [toastMessage, setToastMessage] = useState('')
+  const toastTimerRef = useRef<number | null>(null)
   const currentLanguage = useMemo(
     () =>
       supportedLanguages.find((item) => item.code === language) ??
@@ -47,8 +48,12 @@ export function SettingsPage({
 
     const cached = getCache<UserPreferences>(cacheKey)
     if (cached) {
-      setPreferences(cached)
-      setIsLoadingPreferences(false)
+      queueMicrotask(() => {
+        if (isMounted) {
+          setPreferences(cached)
+          setIsLoadingPreferences(false)
+        }
+      })
     }
 
     fetchPreferences()
@@ -77,12 +82,32 @@ export function SettingsPage({
     }
   }, [user.id])
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current)
+        toastTimerRef.current = null
+      }
+    }
+  }, [])
+
+  function showToast(message: string) {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+
+    setToastMessage(message)
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage('')
+      toastTimerRef.current = null
+    }, 2400)
+  }
+
   function updatePreference<K extends keyof UserPreferences>(
     key: K,
     value: UserPreferences[K],
   ) {
     setPreferences((current) => ({ ...current, [key]: value }))
-    setPreferencesMessage('')
     setPreferencesError('')
   }
 
@@ -97,7 +122,6 @@ export function SettingsPage({
         [key]: value,
       },
     }))
-    setPreferencesMessage('')
     setPreferencesError('')
   }
 
@@ -108,14 +132,13 @@ export function SettingsPage({
     event.preventDefault()
     setPreferencesFeedbackArea(feedbackArea)
     setIsSavingPreferences(true)
-    setPreferencesMessage('')
     setPreferencesError('')
 
     try {
-        const result = await savePreferences(preferences)
-        setCache(`preferences:${user.id}`, result.preferences)
-        setPreferences(result.preferences)
-      setPreferencesMessage(t('settings.preferencesSaved'))
+      const result = await savePreferences(preferences)
+      setCache(`preferences:${user.id}`, result.preferences)
+      setPreferences(result.preferences)
+      showToast(t('settings.preferencesSaved'))
       setIsSavingPreferences(false)
     } catch (error) {
       console.error('[vite] Preferences save failed:', error)
@@ -178,12 +201,6 @@ export function SettingsPage({
                 {preferencesError === 'settings.preferencesLoadFailed'
                   ? t('settings.preferencesLoadFailed')
                   : preferencesError}
-              </p>
-            ) : null}
-
-            {preferencesMessage && preferencesFeedbackArea === 'ai' ? (
-              <p className="status-message" role="status">
-                {preferencesMessage}
               </p>
             ) : null}
 
@@ -279,12 +296,6 @@ export function SettingsPage({
                 {preferencesError === 'settings.preferencesLoadFailed'
                   ? t('settings.preferencesLoadFailed')
                   : preferencesError}
-              </p>
-            ) : null}
-
-            {preferencesMessage && preferencesFeedbackArea === 'preferences' ? (
-              <p className="status-message" role="status">
-                {preferencesMessage}
               </p>
             ) : null}
 
@@ -472,12 +483,6 @@ export function SettingsPage({
               </p>
             ) : null}
 
-            {preferencesMessage && preferencesFeedbackArea === 'account' ? (
-              <p className="status-message" role="status">
-                {preferencesMessage}
-              </p>
-            ) : null}
-
             <button
               type="submit"
               className="primary-button settings-save-button"
@@ -507,6 +512,12 @@ export function SettingsPage({
           </form>
         </section>
       </main>
+
+      {toastMessage ? (
+        <div className="toast-message" role="status">
+          {toastMessage}
+        </div>
+      ) : null}
     </>
   )
 }

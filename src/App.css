@@ -31,7 +31,7 @@
   width: 40px;
   height: 40px;
   border: 4px solid var(--line);
-  border-top-color: var(--ink);
+  border-top-color: var(--control-ink);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -134,8 +134,9 @@
   font-family:
     'Noto Sans JP', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     'Segoe UI', sans-serif;
+  color: var(--heading-ink);
   font-size: 19px;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.1;
   letter-spacing: 0.04em;
   -webkit-text-stroke: 0.2px currentColor;
@@ -162,7 +163,7 @@
   border-radius: 6px;
   color: var(--muted);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   text-align: center;
   text-decoration: none;
 }
@@ -174,6 +175,8 @@
 
 .topbar__nav a.active {
   border: 1px solid var(--line);
+  color: var(--ink);
+  background: var(--surface-soft);
 }
 
 .topbar__actions {
@@ -191,7 +194,7 @@ button {
 
 button:focus-visible,
 a:focus-visible {
-  outline: 3px solid rgba(51, 51, 51, 0.22);
+  outline: 3px solid rgba(68, 71, 71, 0.22);
   outline-offset: 3px;
 }
 
@@ -218,7 +221,7 @@ a:focus-visible {
   gap: 8px;
   min-height: 42px;
   border-radius: 8px;
-  font-weight: 800;
+  font-weight: 700;
   transition:
     transform 180ms ease,
     box-shadow 180ms ease,
@@ -250,7 +253,7 @@ button:disabled {
 .account-button {
   padding: 0 15px;
   color: #fff;
-  background: var(--ink);
+  background: var(--control-ink);
 }
 
 .home {
@@ -282,14 +285,14 @@ button:disabled {
   margin: 0 0 10px;
   color: var(--subtle);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: 0;
 }
 
 .hero-panel h1 {
   max-width: 680px;
   margin: 0;
-  color: var(--ink);
+  color: var(--heading-ink);
   font-size: 64px;
   line-height: 0.98;
   letter-spacing: 0;
@@ -316,8 +319,8 @@ button:disabled {
 
 .primary-button {
   color: #fff;
-  background: var(--ink);
-  box-shadow: 0 12px 24px rgba(51, 51, 51, 0.16);
+  background: var(--control-ink);
+  box-shadow: 0 12px 24px rgba(68, 71, 71, 0.14);
 }
 
 .secondary-button {
@@ -404,7 +407,7 @@ button:disabled {
   color: var(--ink);
   background: var(--surface-soft);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .meal-preview h2,
@@ -439,7 +442,7 @@ button:disabled {
   color: var(--muted);
   background: var(--surface-soft);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .toast-message {
@@ -454,7 +457,7 @@ button:disabled {
   color: var(--ink);
   background: #fff;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   pointer-events: none;
   animation: toast-in-out 2600ms ease both;
 }
@@ -594,28 +597,28 @@ button:disabled {
 }
 
 .tone-green .feature-card__icon {
-  color: var(--accent);
-  background: #f1f3f1;
+  color: var(--control-ink);
+  background: var(--surface-soft);
 }
 
 .tone-red .feature-card__icon {
-  color: var(--danger);
-  background: #f5f2f1;
+  color: var(--control-ink);
+  background: var(--surface-soft);
 }
 
 .tone-yellow .feature-card__icon {
-  color: var(--warning);
-  background: #f6f4ee;
+  color: var(--control-ink);
+  background: var(--surface-soft);
 }
 
 .tone-blue .feature-card__icon {
   color: var(--info);
-  background: #f0f2f5;
+  background: var(--surface-soft);
 }
 
 .tone-violet .feature-card__icon {
-  color: #625b71;
-  background: #f3f2f5;
+  color: var(--control-ink);
+  background: var(--surface-soft);
 }
 
 .tone-slate .feature-card__icon {
@@ -675,7 +678,7 @@ button:disabled {
   background: #f5f2f1;
   font-size: 12px;
   font-style: normal;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ingredients-expand-toggle {
@@ -701,7 +704,7 @@ button:disabled {
 }
 
 .recipe-card:hover {
-  border-color: #cccccc;
+  border-color: var(--subtle);
   box-shadow: var(--shadow-soft);
   transform: translateY(-1px);
 }
@@ -750,7 +753,7 @@ button:disabled {
 .recipe-amounts em {
   color: var(--ink);
   font-style: normal;
-  font-weight: 800;
+  font-weight: 700;
   white-space: nowrap;
 }
 
@@ -767,7 +770,7 @@ button:disabled {
   color: var(--ink);
   background: var(--surface-soft);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .modal-backdrop {
@@ -802,7 +805,7 @@ button:disabled {
   margin-top: 20px;
   color: var(--muted);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .serving-field input {
@@ -851,7 +854,7 @@ button:disabled {
   border-radius: 8px;
   color: var(--ink);
   background: #fff;
-  font-weight: 900;
+  font-weight: 800;
   transition:
     background-color 180ms ease,
     border-color 180ms ease,
@@ -994,7 +997,7 @@ button:disabled {
 .history-sort-field span {
   color: var(--muted);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .history-search-field input,
@@ -1035,7 +1038,7 @@ button:disabled {
   background: var(--surface-soft);
   color: var(--muted);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .history-filters .filter-pill.active span {
@@ -1059,12 +1062,12 @@ button:disabled {
 }
 
 .history-card:hover {
-  border-color: #cccccc;
+  border-color: var(--subtle);
   transform: translateY(-1px);
 }
 
 .history-card.selected {
-  border-color: rgba(58, 58, 58, 0.5);
+  border-color: var(--subtle);
   background: var(--surface-soft);
 }
 
@@ -1098,13 +1101,13 @@ button:disabled {
   width: fit-content;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .history-select-box input {
   width: 18px;
   height: 18px;
-  accent-color: var(--ink);
+  accent-color: var(--control-ink);
 }
 
 .history-card-actions {
@@ -1118,7 +1121,7 @@ button:disabled {
   border-radius: 8px;
   color: var(--danger);
   background: transparent;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .danger-text-button:hover {
@@ -1172,7 +1175,7 @@ button:disabled {
   border-radius: 8px;
   background: var(--surface-soft);
   color: var(--ink);
-  font-weight: 900;
+  font-weight: 800;
   cursor: pointer;
 }
 
@@ -1224,7 +1227,7 @@ button:disabled {
   min-height: 260px;
   place-items: center;
   color: var(--muted);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .receipt-progress {
@@ -1238,7 +1241,7 @@ button:disabled {
   background: var(--surface-soft);
   color: var(--muted);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .receipt-progress strong {
@@ -1310,7 +1313,7 @@ button:disabled {
   gap: 6px;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .receipt-candidate input {
@@ -1360,7 +1363,7 @@ button:disabled {
   gap: 8px;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .test-model-label {
@@ -1368,7 +1371,7 @@ button:disabled {
   gap: 8px;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .test-model-label strong {
@@ -1439,7 +1442,7 @@ button:disabled {
 .test-raw-response {
   color: var(--muted);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .test-raw-response pre {
@@ -1509,13 +1512,13 @@ button:disabled {
 .settings-list dt {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .settings-list dd {
   margin: 5px 0 0;
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
@@ -1549,12 +1552,12 @@ button:disabled {
 }
 
 .language-option:hover {
-  border-color: #cccccc;
+  border-color: var(--subtle);
   transform: translateY(-1px);
 }
 
 .language-option.is-active {
-  border-color: var(--ink);
+  border-color: var(--control-ink);
   background: var(--surface-soft);
 }
 
@@ -1577,7 +1580,7 @@ button:disabled {
 
 .settings-note {
   margin: 0;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .settings-plan-list {
@@ -1610,7 +1613,7 @@ button:disabled {
 .settings-field>span,
 .settings-fieldset legend {
   color: var(--ink);
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .settings-field label span,
@@ -1620,7 +1623,7 @@ button:disabled {
   margin-top: 4px;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .settings-field input,
@@ -1670,13 +1673,13 @@ button:disabled {
   align-items: center;
   gap: 10px;
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .settings-toggle input {
   width: 18px;
   height: 18px;
-  accent-color: var(--ink);
+  accent-color: var(--control-ink);
 }
 
 .settings-field--inline {
@@ -1794,7 +1797,7 @@ button:disabled {
 .admin-reply-form label {
   color: var(--ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .admin-reply-form textarea {
@@ -2049,7 +2052,7 @@ button:disabled {
   margin: 0;
   color: var(--ink);
   font-size: 32px;
-  font-weight: 900;
+  font-weight: 800;
   letter-spacing: -0.02em;
 }
 
@@ -2084,7 +2087,7 @@ button:disabled {
   display: block;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .fridge-summary .card-value {
@@ -2092,7 +2095,7 @@ button:disabled {
   margin: 8px 0 2px;
   color: var(--ink);
   font-size: 36px;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1;
 }
 
@@ -2130,7 +2133,7 @@ button:disabled {
 .fridge-filter-group legend {
   color: var(--ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .fridge-search-field input,
@@ -2147,8 +2150,9 @@ button:disabled {
 }
 
 .fridge-filter-toggle.is-active {
-  border-color: var(--ink);
-  color: var(--ink);
+  border-color: var(--control-ink);
+  color: var(--control-ink);
+  background: var(--surface-soft);
 }
 
 .fridge-filter-options {
@@ -2212,7 +2216,7 @@ button:disabled {
   border-radius: 6px;
   color: var(--ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -2223,7 +2227,7 @@ button:disabled {
 .fridge-category-option input {
   width: 16px;
   height: 16px;
-  accent-color: var(--ink);
+  accent-color: var(--control-ink);
 }
 
 /* Category Filters */
@@ -2255,7 +2259,7 @@ button:disabled {
   margin-right: auto;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .fridge-bulk-actions .secondary-button {
@@ -2291,7 +2295,7 @@ button:disabled {
   background: #fff;
   color: var(--muted);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   transition: all 0.2s ease;
   cursor: pointer;
 }
@@ -2302,8 +2306,8 @@ button:disabled {
 }
 
 .filter-pill.active {
-  border-color: var(--ink);
-  background: var(--ink);
+  border-color: var(--control-ink);
+  background: var(--control-ink);
   color: #fff;
 }
 
@@ -2344,10 +2348,10 @@ button:disabled {
 .category-title {
   margin: 0;
   padding: 14px 20px;
-  background: var(--ink);
+  background: var(--control-ink);
   color: #ffffff;
   font-size: 18px;
-  font-weight: 900;
+  font-weight: 800;
   border-bottom: 1px solid var(--line);
 }
 
@@ -2466,12 +2470,12 @@ button:disabled {
 .fridge-table input[type="checkbox"] {
   width: 18px;
   height: 18px;
-  accent-color: var(--ink);
+  accent-color: var(--control-ink);
 }
 
 .fridge-table th {
   color: var(--muted);
-  font-weight: 700;
+  font-weight: 600;
   background: #fffcfb;
   font-size: 12px;
   text-transform: uppercase;
@@ -2491,12 +2495,12 @@ button:disabled {
 }
 
 .ingredient-name-cell {
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .expiration-warning {
   color: var(--warning);
-  font-weight: bold;
+  font-weight: 700;
 }
 
 .ingredient-name {
@@ -2505,8 +2509,8 @@ button:disabled {
 
 .expiry-alert {
   color: var(--warning);
-  font-weight: bold;
-  background: rgba(245, 158, 11, 0.14);
+  font-weight: 700;
+  background: rgba(var(--warning-rgb), 0.16);
   padding: 2px 8px;
   border-radius: 12px;
   font-size: 0.72rem;
@@ -2522,11 +2526,11 @@ button:disabled {
 }
 
 .fridge-table tr.near-expiration-row {
-  background-color: transparent;
+  background-color: rgba(var(--warning-rgb), 0.05);
 }
 
 .fridge-table tr.near-expiration-row:hover {
-  background-color: var(--surface-soft);
+  background-color: rgba(var(--warning-rgb), 0.09);
 }
 
 .ingredient-name-link {
@@ -2535,11 +2539,15 @@ button:disabled {
   color: var(--ink);
   background: transparent;
   font: inherit;
-  font-weight: 900;
+  font-weight: 800;
   text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.ingredient-name-link--grouped {
   text-decoration: underline;
   text-underline-offset: 3px;
-  cursor: pointer;
 }
 
 .fridge-row-actions {
@@ -2592,7 +2600,7 @@ button:disabled {
   border-radius: 8px;
   background: var(--surface-soft);
   color: var(--ink);
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ingredient-detail-total strong {
@@ -2624,7 +2632,7 @@ button:disabled {
 .ingredient-detail-item > div:first-child span {
   color: var(--muted);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .ingredient-detail-item dl {
@@ -2637,14 +2645,14 @@ button:disabled {
 .ingredient-detail-item dt {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ingredient-detail-item dd {
   margin: 4px 0 0;
   color: var(--ink);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 
@@ -2660,7 +2668,7 @@ button:disabled {
   gap: 6px;
   color: var(--muted);
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .ingredient-form-grid input,
@@ -2782,7 +2790,7 @@ button:disabled {
 .register-card__title {
   margin: 0 0 4px;
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .register-card__desc {
@@ -2813,7 +2821,7 @@ button:disabled {
   background: #fff;
   color: var(--ink);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 800;
   text-align: left;
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
@@ -2825,8 +2833,8 @@ button:disabled {
 }
 
 .register-method-label.is-active {
-  border-color: var(--ink);
-  background: var(--ink);
+  border-color: var(--control-ink);
+  background: var(--control-ink);
   color: #fff;
 }
 
@@ -2863,7 +2871,7 @@ button:disabled {
   margin-bottom: 8px;
   color: var(--ink);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .register-field textarea {
@@ -2881,8 +2889,8 @@ button:disabled {
 
 .register-field textarea:focus {
   outline: none;
-  border-color: var(--ink);
-  box-shadow: 0 0 0 3px rgba(51, 51, 51, 0.1);
+  border-color: var(--control-ink);
+  box-shadow: 0 0 0 3px rgba(68, 71, 71, 0.12);
 }
 
 .register-field__hint {
@@ -2946,7 +2954,7 @@ button:disabled {
 
 .register-upload-zone:hover {
   border-color: var(--subtle);
-  background: #f3f3f3;
+  background: var(--surface-soft);
 }
 
 .register-upload-zone__badge {
@@ -2957,7 +2965,7 @@ button:disabled {
   border: 1px solid var(--line);
   color: var(--ink);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .register-upload-zone strong {
@@ -3082,7 +3090,7 @@ button:disabled {
   background: transparent;
   color: var(--muted);
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -3131,7 +3139,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   color: var(--subtle);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 14px;
 }
 
@@ -3152,20 +3160,20 @@ button:disabled {
 }
 
 .step-item.completed .step-number {
-  background: var(--ink);
-  border-color: var(--ink);
+  background: var(--control-ink);
+  border-color: var(--control-ink);
   color: #fff;
 }
 
 .step-item.active {
   color: var(--ink);
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .step-item.active .step-number {
-  border-color: var(--ink);
-  color: var(--ink);
-  box-shadow: 0 0 0 3px rgba(51, 51, 51, 0.12);
+  border-color: var(--control-ink);
+  color: var(--control-ink);
+  box-shadow: 0 0 0 3px rgba(68, 71, 71, 0.12);
 }
 
 .step-connector {
@@ -3201,7 +3209,7 @@ button:disabled {
   padding: 12px 16px;
   border-radius: 6px;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--muted);
   margin-bottom: 24px;
 }
@@ -3226,7 +3234,7 @@ button:disabled {
 
 .card-index-title {
   font-size: 15px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--muted);
   margin-bottom: 16px;
   padding-bottom: 8px;
@@ -3252,7 +3260,7 @@ button:disabled {
 
 .field-group label {
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
 }
 
@@ -3281,9 +3289,9 @@ button:disabled {
 .field-group input:focus,
 .field-group select:focus,
 .field-group textarea:focus {
-  border-color: var(--ink);
+  border-color: var(--control-ink);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(51, 51, 51, 0.08);
+  box-shadow: 0 0 0 3px rgba(68, 71, 71, 0.1);
 }
 
 .field-group textarea {
@@ -3323,10 +3331,10 @@ button:disabled {
 }
 
 .submit-detail-button {
-  background: var(--ink);
+  background: var(--control-ink);
   color: #fff;
   padding: 0 28px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 /* Inline success button */
@@ -3337,9 +3345,9 @@ button:disabled {
 }
 
 .success-message {
-  border-color: #d1ebd1;
-  background: #f4faf4;
-  color: var(--accent);
+  border-color: var(--line);
+  background: var(--surface-soft);
+  color: var(--ink);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -3414,7 +3422,7 @@ button:disabled {
   gap: 8px;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 900;
+  font-weight: 800;
 }
 
 .recipe-prompt-field textarea,
@@ -3467,7 +3475,7 @@ button:disabled {
 .recipe-inventory-chip small {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 @media (max-width: 820px) {
@@ -3496,7 +3504,7 @@ button:disabled {
   background-color: var(--danger);
   color: #fff;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
   line-height: 1;
   border: 2px solid #fff;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
@@ -3538,7 +3546,7 @@ button:disabled {
 .notifications-header h4 {
   margin: 0;
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   color: var(--ink);
 }
 
@@ -3594,7 +3602,7 @@ button:disabled {
 }
 
 .notification-item__title {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ink);
   margin: 0 0 2px 0;
   font-size: 13px;
@@ -3616,22 +3624,22 @@ button:disabled {
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .notification-item__days.urgent {
-  background-color: rgba(220, 38, 38, 0.12);
+  background-color: rgba(var(--danger-rgb), 0.12);
   color: var(--danger);
 }
 
 .notification-item__days.warning {
-  background-color: rgba(245, 158, 11, 0.12);
+  background-color: rgba(var(--warning-rgb), 0.14);
   color: var(--warning);
 }
 
 .notification-item__days.info {
-  background-color: rgba(59, 130, 246, 0.12);
-  color: #2563eb;
+  background-color: rgba(232, 113, 10, 0.12);
+  color: var(--info);
 }
 
 .notifications-empty {
@@ -3643,35 +3651,48 @@ button:disabled {
 
 /* Expired row and badge styles */
 .fridge-table tr.expired-row {
-  background-color: rgba(220, 38, 38, 0.04);
+  background-color: rgba(var(--danger-rgb), 0.05);
 }
 .fridge-table tr.expired-row:hover {
-  background-color: rgba(220, 38, 38, 0.08);
+  background-color: rgba(var(--danger-rgb), 0.09);
 }
 
 .expiry-alert.expired-badge {
   color: var(--danger);
-  background: rgba(220, 38, 38, 0.12);
-  border: 1px solid rgba(220, 38, 38, 0.22);
+  background: rgba(var(--danger-rgb), 0.12);
+  border: 1px solid rgba(var(--danger-rgb), 0.22);
 }
 
 .expiration-expired {
   color: var(--danger);
-  font-weight: 900;
+  font-weight: 800;
 }
 
 /* Flash highlight animation for scrolling target */
-@keyframes row-flash {
+@keyframes row-flash-warning {
   0% {
-    background-color: rgba(245, 158, 11, 0.4);
+    background-color: rgba(var(--warning-rgb), 0.34);
   }
   100% {
     background-color: transparent;
   }
 }
 
-.fridge-table tr.flash-highlight {
-  animation: row-flash 2s ease-out;
+@keyframes row-flash-danger {
+  0% {
+    background-color: rgba(var(--danger-rgb), 0.28);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.fridge-table tr.flash-highlight-warning {
+  animation: row-flash-warning 2s ease-out;
+}
+
+.fridge-table tr.flash-highlight-danger {
+  animation: row-flash-danger 2s ease-out;
 }
 
 /* Make summary cards clickable */

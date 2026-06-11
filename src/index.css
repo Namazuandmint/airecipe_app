@@ -3,15 +3,18 @@
 :root {
   --app-bg: #ffffff;
   --surface: #ffffff;
-  --surface-soft: #f8f8f8;
+  --surface-soft: #f8f9fa;
   --ink: #3a3a3a;
-  --muted: #666666;
-  --subtle: #8a8a8a;
-  --accent: #4f5b52;
-  --danger: #dc2626;
-  --warning: #f59e0b;
-  --info: #4e5f78;
-  --line: #e6e6e6;
+  --heading-ink: #232323;
+  --control-ink: #444747;
+  --muted: #5f6368;
+  --subtle: #9aa0a6;
+  --danger: #d93025;
+  --danger-rgb: 217, 48, 37;
+  --warning: #fbbc05;
+  --warning-rgb: 251, 188, 5;
+  --info: #5f6368;
+  --line: #dadce0;
   --shadow-soft: none;
   --shadow-subtle: none;
   color: var(--ink);
@@ -19,6 +22,7 @@
   font-family:
     'Noto Sans JP', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
     'Segoe UI', sans-serif;
+  font-feature-settings: 'palt' 1;
   font-synthesis: none;
   line-height: 1.5;
   text-rendering: optimizeLegibility;

@@ -62,9 +62,9 @@ export const jaMessages = {
   'home.hero.showRecipes': 'レシピ表示',
   'home.hero.previewAria': 'おすすめ献立のプレビュー',
   'home.hero.aiSuggestion': 'AI提案例',
-  'home.hero.previewTitle': 'ハンバーグのキノコソテー添え',
+  'home.hero.previewTitle': 'きのこ添えハンバーグ',
   'home.hero.previewDescription':
-    '期限が近い食材を優先した、25分で作れる献立です。',
+    '期限が近い食材を優先して、20分程度で作れます。',
   'home.ingredients.eyebrow': '在庫管理',
   'home.ingredients.title': '登録済みの食材',
   'home.ingredients.add': '登録',

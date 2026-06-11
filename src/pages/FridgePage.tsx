@@ -512,14 +512,17 @@ export function FridgePage({
     setExpirationFilter('all')
   }
 
-  function scrollToMarkedRow(selector: string) {
+  function scrollToMarkedRow(
+    selector: string,
+    highlightClassName: 'flash-highlight-warning' | 'flash-highlight-danger',
+  ) {
     setTimeout(() => {
       const targetRow = document.querySelector(selector)
       if (targetRow) {
         targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        targetRow.classList.add('flash-highlight')
+        targetRow.classList.add(highlightClassName)
         setTimeout(() => {
-          targetRow.classList.remove('flash-highlight')
+          targetRow.classList.remove(highlightClassName)
         }, 2000)
       }
     }, 120)
@@ -527,12 +530,12 @@ export function FridgePage({
 
   function handleScrollToNearExpiration() {
     resetFiltersForScroll()
-    scrollToMarkedRow('[data-near-expiration="true"]')
+    scrollToMarkedRow('[data-near-expiration="true"]', 'flash-highlight-warning')
   }
 
   function handleScrollToExpired() {
     resetFiltersForScroll()
-    scrollToMarkedRow('[data-expired="true"]')
+    scrollToMarkedRow('[data-expired="true"]', 'flash-highlight-danger')
   }
 
   useEffect(() => {
@@ -881,8 +884,8 @@ export function FridgePage({
                 role={summary.nearExpirationCount > 0 ? 'button' : undefined}
                 tabIndex={summary.nearExpirationCount > 0 ? 0 : undefined}
                 style={{
-                  border: summary.nearExpirationCount > 0 ? '1px solid rgba(245, 158, 11, 0.45)' : undefined,
-                  background: summary.nearExpirationCount > 0 ? 'rgba(245, 158, 11, 0.04)' : undefined,
+                  border: summary.nearExpirationCount > 0 ? '1px solid rgba(var(--warning-rgb), 0.4)' : undefined,
+                  background: summary.nearExpirationCount > 0 ? 'rgba(var(--warning-rgb), 0.05)' : undefined,
                 }}
               >
                 <span className="card-label" style={{ color: summary.nearExpirationCount > 0 ? 'var(--warning)' : undefined }}>
@@ -901,8 +904,8 @@ export function FridgePage({
                 role={summary.expiredCount > 0 ? 'button' : undefined}
                 tabIndex={summary.expiredCount > 0 ? 0 : undefined}
                 style={{
-                  border: summary.expiredCount > 0 ? '1px solid rgba(220, 38, 38, 0.45)' : undefined,
-                  background: summary.expiredCount > 0 ? 'rgba(220, 38, 38, 0.04)' : undefined,
+                  border: summary.expiredCount > 0 ? '1px solid rgba(var(--danger-rgb), 0.36)' : undefined,
+                  background: summary.expiredCount > 0 ? 'rgba(var(--danger-rgb), 0.05)' : undefined,
                 }}
               >
                 <span className="card-label" style={{ color: summary.expiredCount > 0 ? 'var(--danger)' : undefined }}>
@@ -1029,14 +1032,16 @@ export function FridgePage({
         </section>
 
         <div className="fridge-bulk-actions">
-          <button
-            type="button"
-            className="secondary-button danger-button"
-            onClick={handleDeleteExpired}
-            disabled={isSaving || expiredInventoryIds.length === 0}
-          >
-            {t('fridge.selection.deleteExpired')}
-          </button>
+          {expiredInventoryIds.length > 0 ? (
+            <button
+              type="button"
+              className="secondary-button danger-button"
+              onClick={handleDeleteExpired}
+              disabled={isSaving}
+            >
+              {t('fridge.selection.deleteExpired')}
+            </button>
+          ) : null}
 
           {isSelectionMode ? (
             <>
@@ -1162,7 +1167,11 @@ export function FridgePage({
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                                   <button
                                     type="button"
-                                    className="ingredient-name-link"
+                                    className={`ingredient-name-link ${
+                                      item.isGrouped
+                                        ? 'ingredient-name-link--grouped'
+                                        : ''
+                                    }`}
                                     onClick={() => setDetailIngredient(item)}
                                   >
                                     {item.name}
