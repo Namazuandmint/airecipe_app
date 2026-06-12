@@ -398,6 +398,70 @@ button:disabled {
   font-weight: 800;
 }
 
+.toast-message {
+  position: fixed;
+  right: clamp(16px, 3vw, 28px);
+  bottom: clamp(16px, 3vw, 28px);
+  z-index: 90;
+  max-width: min(360px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  pointer-events: none;
+  animation: toast-in-out 2600ms ease both;
+}
+
+@keyframes toast-in-out {
+  0% {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  12%,
+  82% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+}
+
+.content-appear {
+  animation: contentFadeIn 0.32s ease both;
+}
+
+@keyframes contentFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.card-stagger > * {
+  animation: contentFadeIn 0.32s ease both;
+}
+
+.card-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.card-stagger > *:nth-child(2) { animation-delay: 50ms; }
+.card-stagger > *:nth-child(3) { animation-delay: 100ms; }
+.card-stagger > *:nth-child(4) { animation-delay: 150ms; }
+.card-stagger > *:nth-child(5) { animation-delay: 200ms; }
+.card-stagger > *:nth-child(6) { animation-delay: 250ms; }
+.card-stagger > *:nth-child(7) { animation-delay: 300ms; }
+.card-stagger > *:nth-child(8) { animation-delay: 350ms; }
+
 .summary-grid article {
   padding: 18px;
   border: 1px solid var(--line);
@@ -566,6 +630,149 @@ button:disabled {
 .panel {
   padding: 22px;
   border-radius: 8px;
+}
+
+.auth-page {
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  padding: 28px;
+  background: var(--app-bg);
+}
+
+.auth-card {
+  display: grid;
+  width: min(100%, 420px);
+  gap: 16px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  animation: contentFadeIn 0.32s ease both;
+}
+
+.auth-brand {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.auth-logo {
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--surface-soft);
+}
+
+.auth-logo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.auth-field {
+  display: grid;
+  gap: 8px;
+}
+
+.auth-field label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.auth-field input {
+  width: 100%;
+  height: 46px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  outline: none;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.auth-field input::placeholder {
+  color: var(--subtle);
+}
+
+.auth-field input:focus {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(58, 58, 58, 0.1);
+}
+
+.auth-field input:-webkit-autofill,
+.auth-field input:-webkit-autofill:hover,
+.auth-field input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--ink);
+  box-shadow:
+    0 0 0 1000px #fff inset,
+    0 0 0 3px rgba(58, 58, 58, 0.1);
+  caret-color: var(--ink);
+  transition: background-color 9999s ease-out;
+}
+
+.auth-link {
+  justify-self: end;
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.auth-link:hover {
+  color: var(--ink);
+}
+
+.auth-note {
+  margin: 0;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.auth-status-message {
+  margin: 0;
+}
+
+.auth-button {
+  width: 100%;
+  min-height: 46px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--subtle);
+  font-size: 12px;
+}
+
+.auth-divider span {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.auth-divider em {
+  font-style: normal;
+}
+
+.auth-google-button svg {
+  margin-right: 2px;
 }
 
 .ingredient-list {
@@ -903,6 +1110,46 @@ button:disabled {
   gap: 14px;
 }
 
+.history-tool-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(170px, 220px) auto;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.history-search-field,
+.history-sort-field {
+  display: grid;
+  gap: 8px;
+}
+
+.history-search-field span,
+.history-sort-field span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.history-search-field input,
+.history-sort-field select {
+  min-height: 44px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0 12px;
+  color: var(--ink);
+  background: #fff;
+  font: inherit;
+}
+
+.history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
 .history-filters {
   margin-bottom: 22px;
 }
@@ -958,6 +1205,66 @@ button:disabled {
   border-color: #cccccc;
   box-shadow: var(--shadow-soft);
   transform: translateY(-1px);
+}
+
+.history-card.selected {
+  border-color: var(--subtle);
+  background: var(--surface-soft);
+}
+
+.history-card-main {
+  display: grid;
+  width: 100%;
+  gap: 14px;
+  padding: 0;
+  border: none;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  box-shadow: none;
+}
+
+.history-card-main:hover {
+  transform: none;
+}
+
+.history-select-box {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.history-select-box input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--ink);
+}
+
+.history-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.danger-text-button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 8px;
+  color: var(--danger);
+  background: transparent;
+  font-weight: 700;
+}
+
+.danger-text-button:hover {
+  background: rgba(220, 38, 38, 0.08);
+}
+
+.history-delete-modal {
+  max-width: 460px;
 }
 
 .history-card h2 {
@@ -1715,6 +2022,14 @@ button:disabled {
   .summary-grid,
   .feature-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .history-tool-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .history-actions {
+    justify-content: flex-start;
   }
 
   .secondary-grid--pair {
