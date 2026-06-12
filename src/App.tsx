@@ -457,7 +457,7 @@ function App() {
 
   let pageNode: React.ReactNode
   const shell = (children: React.ReactNode) => (
-    <PageShell key={currentPage} onNavigate={handleNavigate} onLogout={handleLogout}>
+    <PageShell key={currentPage} currentPage={currentPage} onNavigate={handleNavigate} onLogout={handleLogout}>
       {children}
     </PageShell>
   )
@@ -523,7 +523,6 @@ function App() {
         <SettingsPage
           user={currentUser}
           onNavigate={handleNavigate}
-          onLogout={handleLogout}
         />
       )
       break

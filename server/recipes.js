@@ -1081,6 +1081,47 @@ export async function setRecipeFavorite({
   }
 }
 
+export async function deleteSavedRecipeForUser({
+  recipeId,
+  userId: requestedUserId,
+  language = 'ja',
+}) {
+  if (!recipeId) {
+    throw new Error('recipeId is required')
+  }
+
+  const userId = await resolveUserId(requestedUserId)
+  const client = ensureSupabase()
+
+  await ensureRecipeBelongsToUser({ client, recipeId, userId })
+
+  const relatedDeletes = [
+    client.from('favorites').delete().eq('recipe_id', recipeId).eq('user_id', userId),
+    client.from('cooking_history').delete().eq('recipe_id', recipeId).eq('user_id', userId),
+    client.from('recipe_ingredients').delete().eq('recipe_id', recipeId),
+  ]
+
+  for (const deleteQuery of relatedDeletes) {
+    const { error } = await deleteQuery
+
+    if (error) {
+      throw new Error(`Failed to delete recipe data: ${error.message}`)
+    }
+  }
+
+  const { error } = await client
+    .from('recipes')
+    .delete()
+    .eq('recipe_id', recipeId)
+    .eq('user_id', userId)
+
+  if (error) {
+    throw new Error(`Failed to delete recipe: ${error.message}`)
+  }
+
+  return getSavedRecipesForUser(userId, language)
+}
+
 export async function getCookingHistoryForUser(requestedUserId, language = 'ja') {
   const userId = await resolveUserId(requestedUserId)
   const client = ensureSupabase()

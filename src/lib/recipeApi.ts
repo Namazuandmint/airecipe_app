@@ -119,6 +119,23 @@ export async function fetchSavedRecipes(language?: LanguageCode) {
   }>(withLanguage('/api/recipes/saved', language))
 }
 
+export async function deleteSavedRecipe(
+  recipeId: string,
+  language?: LanguageCode,
+) {
+  const result = await deleteJson<{
+    userId: string
+    recipes: Recipe[]
+  }>(
+    withLanguage(
+      `/api/recipes/saved/${encodeURIComponent(recipeId)}`,
+      language,
+    ),
+  )
+  dispatchInventoryUpdated()
+  return result
+}
+
 export async function setRecipeFavorite(
   recipeId: string,
   isFavorite: boolean,
