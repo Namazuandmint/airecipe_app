@@ -192,7 +192,7 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
       if (nextPreferences) {
         setPreferences(nextPreferences)
       } else {
-        loadData()
+        loadInventoryAndPreferences()
       }
     }
     window.addEventListener('inventory-updated', handleInventoryUpdated)

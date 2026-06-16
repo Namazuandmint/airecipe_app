@@ -362,7 +362,7 @@ export function IngredientRegisterPage({
   return (
     <>
       <main className="ingredient-register-page">
-        <header className="ingredient-register-header">
+        <div className="fridge-header">
           <div>
             <p className="eyebrow">{t('ingredientRegister.eyebrow')}</p>
             <h1>{t('ingredientRegister.title')}</h1>
@@ -377,32 +377,23 @@ export function IngredientRegisterPage({
           >
             {t('common.backHome')}
           </button>
-        </header>
+        </div>
 
         {statusMessage ? (
-          <p className="register-alert register-alert--status" role="status">
+          <p className="status-message" role="status">
             {statusMessage}
           </p>
         ) : null}
 
         {errorMessage ? (
-          <p className="register-alert register-alert--error" role="alert">
+          <p className="status-message" role="alert">
             {errorMessage}
           </p>
         ) : null}
 
-        <section className="register-card" aria-labelledby="input-method-title">
-          <div className="register-card__header">
-            <h2 className="register-card__title" id="input-method-title">
-              {t('ingredientRegister.methodTitle')}
-            </h2>
-            <p className="register-card__desc">
-              {t('ingredientRegister.methodDescription')}
-            </p>
-          </div>
-
+        <section className="register-card" aria-label={t('ingredientRegister.methodAria')}>
           <div
-            className="register-method-tabs"
+            className="register-method-labels register-method-labels--two"
             role="tablist"
             aria-label={t('ingredientRegister.methodAria')}
           >
@@ -411,18 +402,14 @@ export function IngredientRegisterPage({
               role="tab"
               aria-selected={method === 'receipt'}
               aria-controls="panel-receipt"
-              className={`register-method-tab ${
+              className={`register-method-label ${
                 method === 'receipt' ? 'is-active' : ''
               }`}
               onClick={() => selectMethod('receipt')}
             >
-              <span className="register-method-tab__icon" aria-hidden="true">
-                <Icon name="list" />
-              </span>
-              <span className="register-method-tab__label">
-                {t('ingredientRegister.receipt')}
-              </span>
-              <span className="register-method-tab__sub">
+              <img className="register-method-label__icon" src="/receipt.png" alt="" aria-hidden="true" />
+              {t('ingredientRegister.receipt')}
+              <span className="register-method-label__sub">
                 {t('ingredientRegister.receiptSub')}
               </span>
             </button>
@@ -431,167 +418,153 @@ export function IngredientRegisterPage({
               role="tab"
               aria-selected={method === 'image'}
               aria-controls="panel-image"
-              className={`register-method-tab ${
+              className={`register-method-label ${
                 method === 'image' ? 'is-active' : ''
               }`}
               onClick={() => selectMethod('image')}
             >
-              <span className="register-method-tab__icon" aria-hidden="true">
-                <Icon name="camera" />
-              </span>
-              <span className="register-method-tab__label">
-                {t('ingredientRegister.image')}
-              </span>
-              <span className="register-method-tab__sub">
+              <img className="register-method-label__icon" src="/camera.png" alt="" aria-hidden="true" />
+              {t('ingredientRegister.image')}
+              <span className="register-method-label__sub">
                 {t('ingredientRegister.imageSub')}
               </span>
             </button>
           </div>
 
-          <div className="register-panel">
-            {method === 'receipt' ? (
-              <div id="panel-receipt" role="tabpanel">
-                <ReceiptScanPage
-                  embedded
-                  allowManualCandidates={false}
-                  onNavigate={onNavigate}
-                  onLogout={onLogout}
-                  onProceedToDetail={(items) => setDetailItems(items)}
-                />
-              </div>
-            ) : (
-              <div id="panel-image" role="tabpanel" className="register-image-panel">
-                <p className="register-image-lead">
-                  {t('ingredientRegister.imageLead')}
-                </p>
-
-                <div className="register-image-upload">
-                  <div className="register-image-upload__actions">
-                    <label className="register-image-upload__pick">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={(event) =>
-                          void handleFoodImageChange(
-                            event.currentTarget.files?.[0] ?? null,
-                          )
-                        }
-                      />
-                      <Icon name="basket" />
-                      <span>{t('receipt.chooseImage')}</span>
-                      <small>{t('ingredientRegister.fileNote')}</small>
-                    </label>
-                    <button
-                      type="button"
-                      className="secondary-button register-image-upload__camera"
-                      onClick={isCameraOpen ? stopCamera : startCamera}
-                      disabled={isRecognizing}
-                    >
-                      <Icon name="camera" />
-                      <span>
-                        {isCameraOpen
-                          ? t('receipt.stopCamera')
-                          : t('receipt.startCamera')}
-                      </span>
-                    </button>
+          {method === 'receipt' ? (
+            <div id="panel-receipt" role="tabpanel">
+              <ReceiptScanPage
+                embedded
+                allowManualCandidates={false}
+                onNavigate={onNavigate}
+                onLogout={onLogout}
+                onProceedToDetail={(items) => setDetailItems(items)}
+              />
+            </div>
+          ) : (
+            <div id="panel-image" role="tabpanel">
+              <div className="panel receipt-uploader">
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">{t('receipt.sourceEyebrow')}</p>
+                    <h2>{t('receipt.sourceTitle')}</h2>
                   </div>
-
-                  {isCameraOpen ? (
-                    <div className="register-image-camera">
-                      <video
-                        ref={videoRef}
-                        className="register-image-camera__preview"
-                        playsInline
-                        muted
-                      />
-                      <button
-                        type="button"
-                        className="primary-button"
-                        onClick={captureFoodImage}
-                        disabled={isRecognizing}
-                      >
-                        {t('receipt.capture')}
-                      </button>
-                    </div>
-                  ) : null}
-
-                  {imagePreviewUrl ? (
-                    <img
-                      className="register-image-preview"
-                      src={imagePreviewUrl}
-                      alt={t('ingredientRegister.previewAlt')}
-                    />
-                  ) : (
-                    <div className="register-image-placeholder">
-                      <Icon name="camera" />
-                      <span>{t('ingredientRegister.shootFood')}</span>
-                      <small>{t('ingredientRegister.foodEstimate')}</small>
-                    </div>
-                  )}
                 </div>
 
-                {recognizedItems.length ? (
-                  <div className="register-recognition-result">
-                    <h3>{t('ingredientRegister.resultTitle')}</h3>
-                    <div className="register-recognition-list">
-                      {recognizedItems.map((item, index) => (
-                        <label
-                          key={item.id ?? `${item.name}-${index}`}
-                          className="register-recognition-item"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={item.selected}
-                            onChange={(event) =>
-                              toggleRecognizedItem(
-                                index,
-                                event.currentTarget.checked,
-                              )
-                            }
-                          />
-                          <span>
-                            <strong>{item.name}</strong>
-                            <small>
-                              {item.category}
-                              {item.quantity ? ` / ${item.quantity}` : ''}
-                              {item.gram ? ` / ${item.gram}g` : ''}
-                            </small>
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="register-form-actions">
+                <div className="receipt-source-actions">
+                  <label className="receipt-file-field">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) =>
+                        void handleFoodImageChange(
+                          event.currentTarget.files?.[0] ?? null,
+                        )
+                      }
+                    />
+                    <span>{t('receipt.chooseImage')}</span>
+                  </label>
                   <button
                     type="button"
                     className="secondary-button"
-                    onClick={() => {
-                      setRecognizedItems([])
-                      setImagePreviewUrl('')
-                      setStatusMessage('')
-                      setErrorMessage('')
-                      stopCamera()
-                    }}
+                    onClick={isCameraOpen ? stopCamera : startCamera}
+                    disabled={isRecognizing}
                   >
-                    {t('common.cancel')}
-                  </button>
-                  <button
-                    type="button"
-                    className="primary-button"
-                    onClick={continueWithRecognizedItems}
-                    disabled={isRecognizing || !recognizedItems.length}
-                  >
-                    {isRecognizing
-                      ? t('ingredientRegister.recognizing')
-                      : t('ingredientRegister.detailButton')}
-                    <Icon name="arrow" />
+                    {isCameraOpen ? t('receipt.stopCamera') : t('receipt.startCamera')}
                   </button>
                 </div>
+
+                {isCameraOpen ? (
+                  <div className="receipt-camera-panel">
+                    <video
+                      ref={videoRef}
+                      className="receipt-camera-preview"
+                      playsInline
+                      muted
+                    />
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={captureFoodImage}
+                      disabled={isRecognizing}
+                    >
+                      {t('receipt.capture')}
+                    </button>
+                  </div>
+                ) : null}
+
+                {imagePreviewUrl ? (
+                  <img
+                    className="receipt-preview"
+                    src={imagePreviewUrl}
+                    alt={t('ingredientRegister.previewAlt')}
+                  />
+                ) : (
+                  <div className="receipt-placeholder">{t('receipt.noImage')}</div>
+                )}
               </div>
-            )}
-          </div>
+
+              {recognizedItems.length ? (
+                <div className="register-recognition-result">
+                  <h3>{t('ingredientRegister.resultTitle')}</h3>
+                  <div className="register-recognition-list">
+                    {recognizedItems.map((item, index) => (
+                      <label
+                        key={item.id ?? `${item.name}-${index}`}
+                        className="register-recognition-item"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.selected}
+                          onChange={(event) =>
+                            toggleRecognizedItem(
+                              index,
+                              event.currentTarget.checked,
+                            )
+                          }
+                        />
+                        <span>
+                          <strong>{item.name}</strong>
+                          <small>
+                            {item.category}
+                            {item.quantity ? ` / ${item.quantity}` : ''}
+                            {item.gram ? ` / ${item.gram}g` : ''}
+                          </small>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="register-form-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => {
+                    setRecognizedItems([])
+                    setImagePreviewUrl('')
+                    setStatusMessage('')
+                    setErrorMessage('')
+                    stopCamera()
+                  }}
+                >
+                  {t('common.cancel')}
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={continueWithRecognizedItems}
+                  disabled={isRecognizing || !recognizedItems.length}
+                >
+                  {isRecognizing
+                    ? t('ingredientRegister.recognizing')
+                    : t('ingredientRegister.detailButton')}
+                  <Icon name="arrow" />
+                </button>
+              </div>
+            </div>
+          )}
         </section>
       </main>
     </>

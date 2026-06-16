@@ -136,7 +136,6 @@ export function RecipeGeneratePage({
 
       setPreferences(nextPreferences)
       setServings(nextPreferences.defaultServings)
-      setSelectedModel(nextPreferences.recipeModel)
     }
 
     window.addEventListener('preferences-updated', handlePreferencesUpdated)
