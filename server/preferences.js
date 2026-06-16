@@ -5,11 +5,31 @@ const metadataKey = 'ai_recipe_preferences'
 export const defaultUserPreferences = {
   defaultServings: 2,
   avoidedIngredients: '',
+  recipeModel: 'gemini',
+  displayLanguage: 'ja',
+  seasoningMode: 'unlimited',
   notifications: {
     expiration: true,
-    lowStock: false,
     expirationLeadDays: 3,
   },
+}
+
+const allowedRecipeModels = new Set(['gemini', 'groq'])
+const allowedSeasoningModes = new Set(['unlimited', 'strict'])
+const allowedDisplayLanguages = new Set(['ja', 'en', 'fr'])
+
+function sanitizeRecipeModel(value) {
+  return allowedRecipeModels.has(value) ? value : defaultUserPreferences.recipeModel
+}
+
+function sanitizeSeasoningMode(value) {
+  return allowedSeasoningModes.has(value) ? value : defaultUserPreferences.seasoningMode
+}
+
+function sanitizeDisplayLanguage(value) {
+  return allowedDisplayLanguages.has(value)
+    ? value
+    : defaultUserPreferences.displayLanguage
 }
 
 function ensureSupabaseAdmin() {
@@ -57,9 +77,13 @@ export function sanitizeUserPreferences(value) {
       typeof source.avoidedIngredients === 'string'
         ? source.avoidedIngredients.slice(0, 1000)
         : '',
+    recipeModel: sanitizeRecipeModel(source.recipeModel),
+    displayLanguage: sanitizeDisplayLanguage(
+      source.displayLanguage ?? source.language,
+    ),
+    seasoningMode: sanitizeSeasoningMode(source.seasoningMode),
     notifications: {
       expiration: notifications.expiration !== false,
-      lowStock: notifications.lowStock === true,
       expirationLeadDays: sanitizeLeadDays(notifications.expirationLeadDays),
     },
   }

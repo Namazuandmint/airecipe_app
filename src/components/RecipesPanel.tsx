@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import type { Recipe } from '../types/ui'
 import { useI18n } from '../lib/useI18n'
 
@@ -23,7 +24,7 @@ function getRecipeTimestamp(recipe: Recipe) {
   return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
-export function RecipesPanel({
+export const RecipesPanel = memo(function RecipesPanel({
   recipes,
   isGenerating = false,
   onGenerateRecipe,
@@ -31,9 +32,15 @@ export function RecipesPanel({
   onCookRecipe,
 }: RecipesPanelProps) {
   const { t } = useI18n()
-  const visibleRecipes = [...recipes]
-    .sort((left, right) => getRecipeTimestamp(right) - getRecipeTimestamp(left))
-    .slice(0, visibleRecipeCount)
+  const visibleRecipes = useMemo(
+    () =>
+      [...recipes]
+        .sort(
+          (left, right) => getRecipeTimestamp(right) - getRecipeTimestamp(left),
+        )
+        .slice(0, visibleRecipeCount),
+    [recipes],
+  )
 
   return (
     <section className="panel" id="recipes" aria-labelledby="recipes-title">
@@ -80,8 +87,10 @@ export function RecipesPanel({
                 <div className="recipe-amounts">
                   <strong>{t('home.recipes.serving')}</strong>
                   <ul>
-                    {recipe.ingredients.map((ingredient) => (
-                      <li key={ingredient.ingredientId}>
+                    {recipe.ingredients.map((ingredient, index) => (
+                      <li
+                        key={`${ingredient.ingredientId}-${ingredient.name}-${index}`}
+                      >
                         <span>{ingredient.name}</span>
                         <em>
                           {ingredient.amount}
@@ -105,4 +114,4 @@ export function RecipesPanel({
       </div>
     </section>
   )
-}
+})

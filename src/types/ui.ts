@@ -33,9 +33,12 @@ export type AppDestination =
   | 'fridge'
   | 'history'
   | 'receipt'
+  | 'recipe-generate'
   | 'ingredient-register'
   | 'test'
   | 'settings'
+  | 'contact'
+  | 'admin'
   | 'register'
   | 'login'
   | 'receipt-detail'
@@ -95,12 +98,18 @@ export type ReceiptIngredientCandidate = {
   sourceLine?: string | null
 }
 
+export type RecipeModelChoice = 'gemini' | 'groq'
+
+export type SeasoningMode = 'unlimited' | 'strict'
+
 export type UserPreferences = {
   defaultServings: number
   avoidedIngredients: string
+  recipeModel: RecipeModelChoice
+  displayLanguage: 'ja' | 'en' | 'fr'
+  seasoningMode: SeasoningMode
   notifications: {
     expiration: boolean
-    lowStock: boolean
     expirationLeadDays: number
   }
 }

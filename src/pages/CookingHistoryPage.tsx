@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Topbar } from '../components/Topbar'
-import { fetchSavedRecipes } from '../lib/recipeApi'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { deleteSavedRecipe, fetchSavedRecipes } from '../lib/recipeApi'
+import { getCache, setCache } from '../lib/dataCache'
 import { useI18n } from '../lib/useI18n'
 import type { TranslateFn } from '../lib/i18n'
 import type { AppDestination, Recipe } from '../types/ui'
@@ -9,9 +9,11 @@ type CookingHistoryPageProps = {
   onNavigate?: (page: AppDestination) => void
   onSelectRecipe: (recipe: Recipe) => void
   onLogout?: () => void | Promise<void>
+  initialFilter?: RecipeFilter
 }
 
-type RecipeFilter = 'all' | 'uncooked' | 'cooked' | 'favorite'
+export type RecipeFilter = 'all' | 'uncooked' | 'cooked' | 'favorite'
+type RecipeSortMode = 'createdDesc' | 'createdAsc' | 'cookedDesc' | 'nameAsc'
 
 const recipeFilters: Array<{
   labelKey: Parameters<TranslateFn>[0]
@@ -22,6 +24,10 @@ const recipeFilters: Array<{
   { labelKey: 'history.filter.cooked', value: 'cooked' },
   { labelKey: 'history.filter.favorite', value: 'favorite' },
 ]
+
+function getRecipeId(recipe: Recipe) {
+  return recipe.recipeId ?? ''
+}
 
 function formatDateTime(value: string | undefined, language: string) {
   if (!value) {
@@ -61,17 +67,30 @@ function formatRecipeStatus(
 export function CookingHistoryPage({
   onNavigate,
   onSelectRecipe,
-  onLogout,
+  initialFilter = 'all',
 }: CookingHistoryPageProps) {
   const { language, t } = useI18n()
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
   const [retryCount, setRetryCount] = useState(0)
-  const [activeFilter, setActiveFilter] = useState<RecipeFilter>('all')
+  const [activeFilter, setActiveFilter] = useState<RecipeFilter>(initialFilter)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [sortMode, setSortMode] = useState<RecipeSortMode>('createdDesc')
+  const [isSelectionMode, setIsSelectionMode] = useState(false)
+  const [selectedRecipeIds, setSelectedRecipeIds] = useState<Set<string>>(
+    () => new Set(),
+  )
+  const [deleteConfirmIds, setDeleteConfirmIds] = useState<string[] | null>(null)
+  const [toastMessage, setToastMessage] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+  const toastTimerRef = useRef<number | null>(null)
   const filteredRecipes = useMemo(
-    () =>
-      recipes.filter((recipe) => {
+    () => {
+      const normalizedSearch = searchQuery.trim().toLocaleLowerCase()
+
+      return recipes
+        .filter((recipe) => {
         if (activeFilter === 'cooked') {
           return recipe.isCooked
         }
@@ -85,8 +104,46 @@ export function CookingHistoryPage({
         }
 
         return true
-      }),
-    [activeFilter, recipes],
+        })
+        .filter((recipe) => {
+          if (!normalizedSearch) {
+            return true
+          }
+
+          return [
+            recipe.name,
+            recipe.meta,
+            recipe.difficulty ?? '',
+            recipe.reason ?? '',
+            ...(recipe.tags ?? []),
+            ...(recipe.ingredients ?? []).map((ingredient) => ingredient.name),
+          ]
+            .join(' ')
+            .toLocaleLowerCase()
+            .includes(normalizedSearch)
+        })
+        .toSorted((left, right) => {
+          if (sortMode === 'nameAsc') {
+            return left.name.localeCompare(right.name, language)
+          }
+
+          const leftCreated = new Date(left.createdAt ?? '').getTime() || 0
+          const rightCreated = new Date(right.createdAt ?? '').getTime() || 0
+          const leftCooked = new Date(left.cookedAt ?? '').getTime() || 0
+          const rightCooked = new Date(right.cookedAt ?? '').getTime() || 0
+
+          if (sortMode === 'createdAsc') {
+            return leftCreated - rightCreated
+          }
+
+          if (sortMode === 'cookedDesc') {
+            return rightCooked - leftCooked || rightCreated - leftCreated
+          }
+
+          return rightCreated - leftCreated
+        })
+    },
+    [activeFilter, language, recipes, searchQuery, sortMode],
   )
   const filterCounts = useMemo(
     () => ({
@@ -97,15 +154,27 @@ export function CookingHistoryPage({
     }),
     [recipes],
   )
+  const selectedCount = selectedRecipeIds.size
+  const isFilterActive =
+    activeFilter !== 'all' || searchQuery.trim() !== '' || sortMode !== 'createdDesc'
 
   useEffect(() => {
     let isMounted = true
+    const cacheKey = `cooking-history:${language}`
+
+    const cached = getCache<Recipe[]>(cacheKey)
+    if (cached) {
+      setRecipes(cached)
+      setIsLoading(false)
+    }
 
     fetchSavedRecipes(language)
       .then((result) => {
         if (isMounted) {
+          setCache(cacheKey, result.recipes)
           setRecipes(result.recipes)
           setError('')
+          setIsLoading(false)
         }
       })
       .catch((fetchError) => {
@@ -117,10 +186,6 @@ export function CookingHistoryPage({
               ? fetchError.message
               : t('history.fetchFailed'),
           )
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
           setIsLoading(false)
         }
       })
@@ -130,10 +195,109 @@ export function CookingHistoryPage({
     }
   }, [language, retryCount, t])
 
-  return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current)
+      }
+    }
+  }, [])
 
+  function showToast(message: string) {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+
+    setToastMessage(message)
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage('')
+      toastTimerRef.current = null
+    }, 2600)
+  }
+
+  function clearFilters() {
+    setActiveFilter('all')
+    setSearchQuery('')
+    setSortMode('createdDesc')
+  }
+
+  function toggleRecipeSelection(recipeId: string) {
+    if (!recipeId) {
+      return
+    }
+
+    setSelectedRecipeIds((current) => {
+      const next = new Set(current)
+
+      if (next.has(recipeId)) {
+        next.delete(recipeId)
+      } else {
+        next.add(recipeId)
+      }
+
+      if (next.size === 0) {
+        setIsSelectionMode(false)
+      }
+
+      return next
+    })
+  }
+
+  function exitSelectionMode() {
+    setSelectedRecipeIds(new Set())
+    setIsSelectionMode(false)
+  }
+
+  function handleCardAction(recipe: Recipe) {
+    const recipeId = getRecipeId(recipe)
+
+    if (isSelectionMode) {
+      toggleRecipeSelection(recipeId)
+      return
+    }
+
+    onSelectRecipe(recipe)
+  }
+
+  async function executeDeleteRecipes(recipeIds: string[]) {
+    const uniqueIds = Array.from(new Set(recipeIds)).filter(Boolean)
+
+    if (!uniqueIds.length) {
+      showToast(t('history.delete.none'))
+      return
+    }
+
+    setIsDeleting(true)
+    setError('')
+
+    try {
+      let latestRecipes = recipes
+
+      for (const recipeId of uniqueIds) {
+        const result = await deleteSavedRecipe(recipeId, language)
+        latestRecipes = result.recipes
+      }
+
+      setCache(`cooking-history:${language}`, latestRecipes)
+      setRecipes(latestRecipes)
+      setSelectedRecipeIds(new Set())
+      setIsSelectionMode(false)
+      setDeleteConfirmIds(null)
+      showToast(t('history.delete.deletedCount', { count: uniqueIds.length }))
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : t('history.delete.failed'),
+      )
+      setDeleteConfirmIds(null)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  return (
+    <>
       <main className="history-page">
         <div className="fridge-header">
           <div>
@@ -150,7 +314,10 @@ export function CookingHistoryPage({
         </div>
 
         {isLoading ? (
-          <p className="status-message">{t('history.loading')}</p>
+          <div className="fridge-loading">
+            <div className="loading-spinner" />
+            <p>{t('history.loading')}</p>
+          </div>
         ) : null}
 
         {error ? (
@@ -175,51 +342,194 @@ export function CookingHistoryPage({
         ) : null}
 
         {!isLoading && !error && recipes.length > 0 ? (
-          <div className="category-filters history-filters">
-            {recipeFilters.map((filter) => (
-              <button
-                key={filter.value}
-                type="button"
-                className={`filter-pill ${
-                  activeFilter === filter.value ? 'active' : ''
-                }`}
-                onClick={() => setActiveFilter(filter.value)}
-              >
-                {t(filter.labelKey)}
-                <span>{filterCounts[filter.value]}</span>
-              </button>
-            ))}
-          </div>
-        ) : null}
+          <div className="content-appear">
+            <div className="history-tool-panel">
+              <label className="history-search-field">
+                <span>{t('history.search.label')}</span>
+                <input
+                  type="search"
+                  value={searchQuery}
+                  placeholder={t('history.search.placeholder')}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                />
+              </label>
 
-        {!isLoading && !error && recipes.length > 0 && filteredRecipes.length === 0 ? (
-          <p className="empty-state">{t('history.emptyFilter')}</p>
-        ) : null}
+              <label className="history-sort-field">
+                <span>{t('history.sort.label')}</span>
+                <select
+                  value={sortMode}
+                  onChange={(event) =>
+                    setSortMode(event.target.value as RecipeSortMode)
+                  }
+                >
+                  <option value="createdDesc">{t('history.sort.createdDesc')}</option>
+                  <option value="createdAsc">{t('history.sort.createdAsc')}</option>
+                  <option value="cookedDesc">{t('history.sort.cookedDesc')}</option>
+                  <option value="nameAsc">{t('history.sort.nameAsc')}</option>
+                </select>
+              </label>
 
-        <div className="history-list">
-          {filteredRecipes.map((recipe) => (
-            <button
-              key={recipe.recipeId}
-              type="button"
-              className="history-card"
-              onClick={() => onSelectRecipe(recipe)}
-            >
-              <div>
-                <span className="status-pill">
-                  {formatRecipeStatus(recipe, language, t)}
-                </span>
-                <h2>{recipe.name}</h2>
-                <p>{recipe.meta}</p>
+              <div className="history-actions">
+                {isFilterActive ? (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={clearFilters}
+                  >
+                    {t('history.filter.clear')}
+                  </button>
+                ) : null}
+                {isSelectionMode ? (
+                  <>
+                    <button
+                      type="button"
+                      className="secondary-button danger-button"
+                      disabled={selectedCount === 0 || isDeleting}
+                      onClick={() =>
+                        setDeleteConfirmIds(Array.from(selectedRecipeIds))
+                      }
+                    >
+                      {t('history.selection.deleteSelected', {
+                        count: selectedCount,
+                      })}
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={exitSelectionMode}
+                    >
+                      {t('history.selection.cancel')}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => setIsSelectionMode(true)}
+                  >
+                    {t('history.selection.start')}
+                  </button>
+                )}
               </div>
-              <div className="tag-row">
-                {recipe.tags.map((tag) => (
-                  <span key={tag}>{tag}</span>
+            </div>
+
+            <div className="category-filters history-filters">
+              {recipeFilters.map((filter) => (
+                <button
+                  key={filter.value}
+                  type="button"
+                  className={`filter-pill ${
+                    activeFilter === filter.value ? 'active' : ''
+                  }`}
+                  onClick={() => setActiveFilter(filter.value)}
+                >
+                  {t(filter.labelKey)}
+                  <span>{filterCounts[filter.value]}</span>
+                </button>
+              ))}
+            </div>
+
+            {filteredRecipes.length === 0 ? (
+              <p className="empty-state">{t('history.emptyFilter')}</p>
+            ) : (
+              <div className="history-list card-stagger">
+                {filteredRecipes.map((recipe) => (
+                  <article
+                    key={getRecipeId(recipe)}
+                    className={`history-card ${
+                      selectedRecipeIds.has(getRecipeId(recipe)) ? 'selected' : ''
+                    }`}
+                  >
+                    {isSelectionMode ? (
+                      <label className="history-select-box">
+                        <input
+                          type="checkbox"
+                          checked={selectedRecipeIds.has(getRecipeId(recipe))}
+                          onChange={() => toggleRecipeSelection(getRecipeId(recipe))}
+                        />
+                        <span>{t('history.selection.item')}</span>
+                      </label>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="history-card-main"
+                      onClick={() => handleCardAction(recipe)}
+                    >
+                      <div>
+                        <span className="status-pill">
+                          {formatRecipeStatus(recipe, language, t)}
+                        </span>
+                        <h2>{recipe.name}</h2>
+                        <p>{recipe.meta}</p>
+                      </div>
+                      <div className="tag-row">
+                        {recipe.tags.map((tag) => (
+                          <span key={tag}>{tag}</span>
+                        ))}
+                      </div>
+                    </button>
+                    <div className="history-card-actions">
+                      <button
+                        type="button"
+                        className="danger-text-button"
+                        disabled={isDeleting || !getRecipeId(recipe)}
+                        onClick={() => setDeleteConfirmIds([getRecipeId(recipe)])}
+                      >
+                        {t('common.delete')}
+                      </button>
+                    </div>
+                  </article>
                 ))}
               </div>
-            </button>
-          ))}
-        </div>
+            )}
+          </div>
+        ) : null}
       </main>
-    </div>
+
+      {toastMessage ? (
+        <div className="toast-message" role="status">
+          {toastMessage}
+        </div>
+      ) : null}
+
+      {deleteConfirmIds ? (
+        <div className="modal-backdrop" role="presentation">
+          <section
+            className="cook-modal history-delete-modal"
+            aria-labelledby="history-delete-title"
+            aria-modal="true"
+            role="dialog"
+          >
+            <p className="eyebrow">{t('common.delete')}</p>
+            <h2 id="history-delete-title">{t('history.delete.title')}</h2>
+            <p>
+              {t('history.delete.confirm', {
+                count: deleteConfirmIds.length,
+              })}
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={isDeleting}
+                onClick={() => setDeleteConfirmIds(null)}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="secondary-button danger-button"
+                disabled={isDeleting}
+                onClick={() => {
+                  void executeDeleteRecipes(deleteConfirmIds)
+                }}
+              >
+                {isDeleting ? t('common.deleting') : t('common.delete')}
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </>
   )
 }

@@ -1,35 +1,39 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../components/Icon'
-import { Topbar } from '../components/Topbar'
 import { supportedLanguages } from '../lib/i18n'
+import { getCache, setCache } from '../lib/dataCache'
 import { useI18n } from '../lib/useI18n'
 import {
   defaultPreferences,
+  dispatchPreferencesUpdated,
   fetchPreferences,
   savePreferences,
 } from '../lib/preferencesApi'
 import type { AuthUser } from '../lib/authApi'
 import type { AppDestination, UserPreferences } from '../types/ui'
 
+type PreferencesFeedbackArea = 'ai' | 'preferences' | 'account'
+
 type SettingsPageProps = {
   user: AuthUser
   onNavigate?: (page: AppDestination) => void
-  onLogout?: () => void | Promise<void>
 }
 
 export function SettingsPage({
   user,
   onNavigate,
-  onLogout,
 }: SettingsPageProps) {
   const { language, setLanguage, t } = useI18n()
-  const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [preferences, setPreferences] =
     useState<UserPreferences>(defaultPreferences)
   const [isLoadingPreferences, setIsLoadingPreferences] = useState(true)
-  const [isSavingPreferences, setIsSavingPreferences] = useState(false)
-  const [preferencesMessage, setPreferencesMessage] = useState('')
   const [preferencesError, setPreferencesError] = useState('')
+  const [preferencesFeedbackArea, setPreferencesFeedbackArea] =
+    useState<PreferencesFeedbackArea>('preferences')
+  const [toastMessage, setToastMessage] = useState('')
+  const preferencesRef = useRef<UserPreferences>(defaultPreferences)
+  const saveTimerRef = useRef<number | null>(null)
+  const toastTimerRef = useRef<number | null>(null)
   const currentLanguage = useMemo(
     () =>
       supportedLanguages.find((item) => item.code === language) ??
@@ -39,12 +43,27 @@ export function SettingsPage({
 
   useEffect(() => {
     let isMounted = true
+    const cacheKey = `preferences:${user.id}`
+
+    const cached = getCache<UserPreferences>(cacheKey)
+    if (cached) {
+      queueMicrotask(() => {
+        if (isMounted) {
+          preferencesRef.current = cached
+          setPreferences(cached)
+          setIsLoadingPreferences(false)
+        }
+      })
+    }
 
     fetchPreferences()
       .then((result) => {
         if (isMounted) {
+          setCache(cacheKey, result.preferences)
+          preferencesRef.current = result.preferences
           setPreferences(result.preferences)
           setPreferencesError('')
+          setIsLoadingPreferences(false)
         }
       })
       .catch((error) => {
@@ -55,10 +74,6 @@ export function SettingsPage({
               ? error.message
               : 'settings.preferencesLoadFailed',
           )
-        }
-      })
-      .finally(() => {
-        if (isMounted) {
           setIsLoadingPreferences(false)
         }
       })
@@ -68,40 +83,112 @@ export function SettingsPage({
     }
   }, [user.id])
 
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current)
+        toastTimerRef.current = null
+      }
+      if (saveTimerRef.current !== null) {
+        window.clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+        void savePreferences(preferencesRef.current)
+          .then((result) => {
+            setCache(`preferences:${user.id}`, result.preferences)
+          })
+          .catch((error) => {
+            console.warn('[vite] Pending preferences save failed:', error)
+          })
+      }
+    }
+  }, [user.id])
+
+  function showToast(message: string) {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+
+    setToastMessage(message)
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage('')
+      toastTimerRef.current = null
+    }, 2400)
+  }
+
   function updatePreference<K extends keyof UserPreferences>(
     key: K,
     value: UserPreferences[K],
+    feedbackArea: PreferencesFeedbackArea,
+    delayMs = 0,
   ) {
-    setPreferences((current) => ({ ...current, [key]: value }))
-    setPreferencesMessage('')
-    setPreferencesError('')
+    applyPreferences(
+      {
+        ...preferencesRef.current,
+        [key]: value,
+      },
+      feedbackArea,
+      delayMs,
+    )
   }
 
   function updateNotificationPreference(
     key: keyof UserPreferences['notifications'],
     value: boolean | number,
+    delayMs = 0,
   ) {
-    setPreferences((current) => ({
-      ...current,
-      notifications: {
-        ...current.notifications,
-        [key]: value,
+    applyPreferences(
+      {
+        ...preferencesRef.current,
+        notifications: {
+          ...preferencesRef.current.notifications,
+          [key]: value,
+        },
       },
-    }))
-    setPreferencesMessage('')
-    setPreferencesError('')
+      'account',
+      delayMs,
+    )
   }
 
-  async function handlePreferencesSubmit(event: FormEvent) {
-    event.preventDefault()
-    setIsSavingPreferences(true)
-    setPreferencesMessage('')
+  function updateDisplayLanguage(nextLanguage: UserPreferences['displayLanguage']) {
+    setLanguage(nextLanguage)
+    updatePreference('displayLanguage', nextLanguage, 'preferences')
+  }
+
+  function applyPreferences(
+    nextPreferences: UserPreferences,
+    feedbackArea: PreferencesFeedbackArea,
+    delayMs = 0,
+  ) {
+    preferencesRef.current = nextPreferences
+    setPreferences(nextPreferences)
+    setCache(`preferences:${user.id}`, nextPreferences)
+    dispatchPreferencesUpdated(nextPreferences)
+    setPreferencesFeedbackArea(feedbackArea)
     setPreferencesError('')
 
+    if (saveTimerRef.current !== null) {
+      window.clearTimeout(saveTimerRef.current)
+    }
+
+    if (delayMs <= 0) {
+      void persistPreferences(nextPreferences)
+      return
+    }
+
+    saveTimerRef.current = window.setTimeout(() => {
+      saveTimerRef.current = null
+      void persistPreferences(nextPreferences)
+    }, delayMs)
+  }
+
+  async function persistPreferences(nextPreferences: UserPreferences) {
     try {
-      const result = await savePreferences(preferences)
+      const result = await savePreferences(nextPreferences)
+
+      setCache(`preferences:${user.id}`, result.preferences)
+      preferencesRef.current = result.preferences
       setPreferences(result.preferences)
-      setPreferencesMessage(t('settings.preferencesSaved'))
+      showToast(t('settings.preferencesSaved'))
     } catch (error) {
       console.error('[vite] Preferences save failed:', error)
       setPreferencesError(
@@ -109,30 +196,16 @@ export function SettingsPage({
           ? error.message
           : t('settings.preferencesSaveFailed'),
       )
-    } finally {
-      setIsSavingPreferences(false)
     }
-  }
-
-  async function handleLogout() {
-    if (!onLogout) {
-      return
-    }
-
-    setIsLoggingOut(true)
-    await onLogout()
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="settings-page">
         <div className="fridge-header">
           <div>
             <p className="eyebrow">{t('settings.eyebrow')}</p>
             <h1>{t('settings.title')}</h1>
-            <p className="settings-lead">{t('settings.subtitle')}</p>
           </div>
           <button
             type="button"
@@ -147,32 +220,58 @@ export function SettingsPage({
         </div>
 
         <section className="settings-grid" aria-label={t('settings.title')}>
-          <article className="panel settings-section">
+          <article
+            className="panel settings-section settings-preferences-form settings-ai-card"
+          >
             <div className="section-heading">
               <div>
-                <p className="eyebrow">{t('settings.signedIn')}</p>
-                <h2>{t('settings.accountTitle')}</h2>
+                <p className="eyebrow">AI</p>
+                <h2>{t('settings.recipeModelTitle')}</h2>
               </div>
             </div>
             <p className="settings-section__description">
-              {t('settings.accountDescription')}
+              {t('settings.recipeModelDescription')}
             </p>
-            <dl className="settings-list">
-              <div>
-                <dt>{t('settings.email')}</dt>
-                <dd>{user.email ?? '-'}</dd>
+
+            {preferencesError && preferencesFeedbackArea === 'ai' ? (
+              <p className="status-message" role="alert">
+                {preferencesError === 'settings.preferencesLoadFailed'
+                  ? t('settings.preferencesLoadFailed')
+                  : preferencesError}
+              </p>
+            ) : null}
+
+            <fieldset className="settings-fieldset settings-fieldset--plain">
+              <legend>{t('settings.recipeModelTitle')}</legend>
+              <div className="language-options" role="radiogroup">
+                {(['gemini', 'groq'] as const).map((modelOption) => (
+                  <button
+                    key={modelOption}
+                    type="button"
+                    className={`language-option ${
+                      preferences.recipeModel === modelOption ? 'is-active' : ''
+                    }`}
+                    role="radio"
+                    aria-checked={preferences.recipeModel === modelOption}
+                    disabled={isLoadingPreferences}
+                    onClick={() =>
+                      updatePreference('recipeModel', modelOption, 'ai')
+                    }
+                  >
+                    <strong>
+                      {modelOption === 'gemini'
+                        ? t('settings.recipeModelGemini')
+                        : t('settings.recipeModelGpt')}
+                    </strong>
+                    <span>
+                      {modelOption === 'gemini'
+                        ? t('settings.recipeModelGeminiNote')
+                        : t('settings.recipeModelGptNote')}
+                    </span>
+                  </button>
+                ))}
               </div>
-              <div>
-                <dt>{t('settings.userId')}</dt>
-                <dd className="settings-mono">{user.id}</dd>
-              </div>
-              <div>
-                <dt>{t('settings.authStatus')}</dt>
-                <dd>
-                  <span className="status-pill">{t('settings.signedIn')}</span>
-                </dd>
-              </div>
-            </dl>
+            </fieldset>
           </article>
 
           <article className="panel settings-section">
@@ -195,10 +294,11 @@ export function SettingsPage({
                   }`}
                   role="radio"
                   aria-checked={language === item.code}
-                  onClick={() => setLanguage(item.code)}
+                  disabled={isLoadingPreferences}
+                  onClick={() => updateDisplayLanguage(item.code)}
                 >
                   <strong>{item.label}</strong>
-                  <span>{item.nativeName}</span>
+                  <span>{item.description}</span>
                 </button>
               ))}
             </div>
@@ -207,9 +307,8 @@ export function SettingsPage({
             </p>
           </article>
 
-          <form
+          <article
             className="panel settings-section settings-preferences-form"
-            onSubmit={handlePreferencesSubmit}
           >
             <div className="section-heading">
               <div>
@@ -221,17 +320,11 @@ export function SettingsPage({
               {t('settings.preferencesDescription')}
             </p>
 
-            {preferencesError ? (
+            {preferencesError && preferencesFeedbackArea === 'preferences' ? (
               <p className="status-message" role="alert">
                 {preferencesError === 'settings.preferencesLoadFailed'
                   ? t('settings.preferencesLoadFailed')
                   : preferencesError}
-              </p>
-            ) : null}
-
-            {preferencesMessage ? (
-              <p className="status-message" role="status">
-                {preferencesMessage}
               </p>
             ) : null}
 
@@ -246,11 +339,12 @@ export function SettingsPage({
                 min="1"
                 max="20"
                 value={preferences.defaultServings}
-                disabled={isLoadingPreferences || isSavingPreferences}
+                disabled={isLoadingPreferences}
                 onChange={(event) =>
                   updatePreference(
                     'defaultServings',
                     Math.max(1, Number(event.target.value) || 1),
+                    'preferences',
                   )
                 }
               />
@@ -266,22 +360,101 @@ export function SettingsPage({
                 rows={4}
                 value={preferences.avoidedIngredients}
                 placeholder={t('settings.avoidPlaceholder')}
-                disabled={isLoadingPreferences || isSavingPreferences}
+                disabled={isLoadingPreferences}
                 onChange={(event) =>
-                  updatePreference('avoidedIngredients', event.target.value)
+                  updatePreference(
+                    'avoidedIngredients',
+                    event.target.value,
+                    'preferences',
+                    400,
+                  )
                 }
               />
             </div>
 
+            <fieldset className="settings-fieldset settings-fieldset--plain">
+              <legend>{t('settings.seasoningMode')}</legend>
+              <p className="settings-section__description">
+                {t('settings.seasoningModeDescription')}
+              </p>
+              <div className="language-options" role="radiogroup">
+                {([
+                  ['unlimited', t('settings.seasoningUnlimited'), t('settings.seasoningUnlimitedNote')],
+                  ['strict', t('settings.seasoningStrict'), t('settings.seasoningStrictNote')],
+                ] as const).map(([value, label, note]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    className={`language-option ${
+                      preferences.seasoningMode === value ? 'is-active' : ''
+                    }`}
+                    role="radio"
+                    aria-checked={preferences.seasoningMode === value}
+                    disabled={isLoadingPreferences}
+                    onClick={() =>
+                      updatePreference('seasoningMode', value, 'preferences')
+                    }
+                  >
+                    <strong>{label}</strong>
+                    <span>{note}</span>
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+          </article>
+
+          <article
+            className="panel settings-section settings-account-card settings-preferences-form"
+          >
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">{t('settings.signedIn')}</p>
+                <h2>{t('settings.accountTitle')}</h2>
+              </div>
+            </div>
+            <dl className="settings-list">
+              <div>
+                <dt>{t('settings.email')}</dt>
+                <dd>{user.email ?? '-'}</dd>
+              </div>
+              <div>
+                <dt>{t('settings.userId')}</dt>
+                <dd className="settings-mono">{user.id}</dd>
+              </div>
+              <div>
+                <dt>{t('settings.authStatus')}</dt>
+                <dd>
+                  <span className="status-pill">{t('settings.signedIn')}</span>
+                </dd>
+              </div>
+              {user.isAdmin ? (
+                <div>
+                  <dt>{t('settings.adminStatus')}</dt>
+                  <dd>
+                    <span className="status-pill">{t('settings.adminUser')}</span>
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+            {user.isAdmin ? (
+              <button
+                type="button"
+                className="secondary-button settings-admin-button"
+                onClick={() => onNavigate?.('admin')}
+              >
+                <Icon name="message" />
+                <span>{t('settings.openAdminConsole')}</span>
+              </button>
+            ) : null}
             <fieldset className="settings-fieldset">
               <legend>{t('settings.notifications')}</legend>
-              <p>{t('settings.notificationsDescription')}</p>
 
               <label className="settings-toggle">
                 <input
                   type="checkbox"
                   checked={preferences.notifications.expiration}
-                  disabled={isLoadingPreferences || isSavingPreferences}
+                  disabled={isLoadingPreferences}
                   onChange={(event) =>
                     updateNotificationPreference(
                       'expiration',
@@ -292,21 +465,6 @@ export function SettingsPage({
                 <span>{t('settings.expirationNotification')}</span>
               </label>
 
-              <label className="settings-toggle">
-                <input
-                  type="checkbox"
-                  checked={preferences.notifications.lowStock}
-                  disabled={isLoadingPreferences || isSavingPreferences}
-                  onChange={(event) =>
-                    updateNotificationPreference(
-                      'lowStock',
-                      event.currentTarget.checked,
-                    )
-                  }
-                />
-                <span>{t('settings.lowStockNotification')}</span>
-              </label>
-
               <label className="settings-field settings-field--inline">
                 <span>{t('settings.expirationLeadDays')}</span>
                 <input
@@ -314,7 +472,7 @@ export function SettingsPage({
                   min="1"
                   max="30"
                   value={preferences.notifications.expirationLeadDays}
-                  disabled={isLoadingPreferences || isSavingPreferences}
+                  disabled={isLoadingPreferences}
                   onChange={(event) =>
                     updateNotificationPreference(
                       'expirationLeadDays',
@@ -325,46 +483,23 @@ export function SettingsPage({
               </label>
             </fieldset>
 
-            <button
-              type="submit"
-              className="primary-button settings-save-button"
-              disabled={isLoadingPreferences || isSavingPreferences}
-            >
-              {isSavingPreferences
-                ? t('settings.savingPreferences')
-                : t('settings.savePreferences')}
-            </button>
-          </form>
+            {preferencesError && preferencesFeedbackArea === 'account' ? (
+              <p className="status-message" role="alert">
+                {preferencesError === 'settings.preferencesLoadFailed'
+                  ? t('settings.preferencesLoadFailed')
+                  : preferencesError}
+              </p>
+            ) : null}
 
-          <article className="panel settings-section">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">{t('common.logout')}</p>
-                <h2>{t('settings.dataSecurityTitle')}</h2>
-              </div>
-            </div>
-            <p className="settings-section__description">
-              {t('settings.dataSecurityDescription')}
-            </p>
-            <div className="settings-session-row">
-              <div>
-                <strong>{t('settings.logoutTitle')}</strong>
-                <span>{t('settings.logoutDescription')}</span>
-              </div>
-              <button
-                type="button"
-                className="secondary-button danger-button"
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-              >
-                {isLoggingOut
-                  ? t('settings.loggingOut')
-                  : t('settings.logoutButton')}
-              </button>
-            </div>
           </article>
         </section>
       </main>
-    </div>
+
+      {toastMessage ? (
+        <div className="toast-message" role="status">
+          {toastMessage}
+        </div>
+      ) : null}
+    </>
   )
 }

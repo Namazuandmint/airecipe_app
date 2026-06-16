@@ -1,7 +1,9 @@
+import { memo, useMemo, useState } from 'react'
 import type { Ingredient } from '../types/ui'
 import { useI18n } from '../lib/useI18n'
 
 const visibleExpirationDays = 7
+const MAX_VISIBLE_ITEMS = 7
 
 function getDaysUntilExpiration(ingredient: Ingredient) {
   if (!ingredient.expirationDate) {
@@ -21,7 +23,7 @@ function getDaysUntilExpiration(ingredient: Ingredient) {
   )
 }
 
-export function IngredientsPanel({
+export const IngredientsPanel = memo(function IngredientsPanel({
   ingredients,
   onAddIngredient,
 }: {
@@ -29,25 +31,36 @@ export function IngredientsPanel({
   onAddIngredient?: () => void
 }) {
   const { t } = useI18n()
-  const visibleIngredients = [...ingredients]
-    .filter((ingredient) => {
-      const daysUntilExpiration = getDaysUntilExpiration(ingredient)
+  const [isExpanded, setIsExpanded] = useState(false)
 
-      return (
-        daysUntilExpiration !== null &&
-        daysUntilExpiration >= 0 &&
-        daysUntilExpiration <= visibleExpirationDays
+  const visibleIngredients = useMemo(() => {
+    const withDays = ingredients
+      .map((ingredient) => ({
+        ingredient,
+        days: getDaysUntilExpiration(ingredient),
+      }))
+      .filter(
+        (entry): entry is { ingredient: Ingredient; days: number } =>
+          entry.days !== null &&
+          entry.days >= 0 &&
+          entry.days <= visibleExpirationDays,
       )
-    })
-    .sort((left, right) => {
-      const leftDays = getDaysUntilExpiration(left) ?? Number.MAX_SAFE_INTEGER
-      const rightDays = getDaysUntilExpiration(right) ?? Number.MAX_SAFE_INTEGER
 
-      return leftDays - rightDays
-    })
+    withDays.sort((left, right) => left.days - right.days)
+    return withDays.map((entry) => entry.ingredient)
+  }, [ingredients])
+
+  const hasMore = visibleIngredients.length > MAX_VISIBLE_ITEMS
+  const displayedIngredients = isExpanded || !hasMore
+    ? visibleIngredients
+    : visibleIngredients.slice(0, MAX_VISIBLE_ITEMS)
 
   return (
-    <section className="panel" id="ingredients" aria-labelledby="ingredients-title">
+    <section
+      className="panel"
+      id="ingredients"
+      aria-labelledby="ingredients-title"
+    >
       <div className="section-heading">
         <div>
           <p className="eyebrow">{t('home.ingredients.eyebrow')}</p>
@@ -58,9 +71,9 @@ export function IngredientsPanel({
         </button>
       </div>
 
-      {visibleIngredients.length ? (
+      {displayedIngredients.length ? (
         <ul className="ingredient-list">
-          {visibleIngredients.map((ingredient) => (
+          {displayedIngredients.map((ingredient) => (
             <li key={ingredient.inventoryId ?? ingredient.name}>
               <span>
                 <strong>{ingredient.name}</strong>
@@ -73,6 +86,18 @@ export function IngredientsPanel({
       ) : (
         <p className="empty-state">{t('home.ingredients.empty')}</p>
       )}
+
+      {hasMore ? (
+        <button
+          type="button"
+          className="small-button ingredients-expand-toggle"
+          onClick={() => setIsExpanded((current) => !current)}
+        >
+          {isExpanded
+            ? t('home.ingredients.expandLess')
+            : t('home.ingredients.expandMore', { remaining: visibleIngredients.length - MAX_VISIBLE_ITEMS })}
+        </button>
+      ) : null}
     </section>
   )
-}
+})

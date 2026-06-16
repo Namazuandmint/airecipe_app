@@ -1,11 +1,12 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Icon } from '../components/Icon'
-import { Topbar } from '../components/Topbar'
 import { generateGeminiContent } from '../lib/geminiApi'
+import { useI18n } from '../lib/useI18n'
+import { ReceiptDetailRegisterPage } from './ReceiptDetailRegisterPage'
+import { ReceiptScanPage } from './ReceiptScanPage'
 import type { AppDestination, ReceiptIngredientCandidate } from '../types/ui'
 
-/** 登録方法: 手入力 or 画像認識（UIモック） */
-type RegisterMethod = 'manual' | 'image'
+type RegisterMethod = 'receipt' | 'image'
 
 type IngredientRegisterPageProps = {
   onNavigate?: (page: AppDestination) => void
@@ -14,9 +15,6 @@ type IngredientRegisterPageProps = {
   onContinue?: (names: string[]) => void
   onContinueCandidates?: (items: ReceiptIngredientCandidate[]) => void
 }
-
-const defaultNames = ''
-const foodRecognitionModel = 'gemma-4-31b-it'
 
 const foodRecognitionPrompt = `画像に写っている食品・食材だけを抽出してください。
 レシート、値札、食器、調理器具、背景、人物は食材として扱わないでください。
@@ -38,14 +36,6 @@ const foodRecognitionPrompt = `画像に写っている食品・食材だけを�
   ]
 }`
 
-/** テキストエリアの改行区切りを食材名の配列に変換する */
-function parseIngredientNames(value: string) {
-  return value
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-}
-
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
@@ -55,28 +45,88 @@ function readFileAsDataUrl(file: File) {
   })
 }
 
-function parseJsonFromModel(text: string) {
+function parseJsonFromModel(text: string, errorMessage: string) {
   const normalized = text
     .trim()
     .replace(/^```json\s*/i, '')
     .replace(/^```\s*/i, '')
     .replace(/\s*```$/i, '')
+    .trim()
 
   try {
     return JSON.parse(normalized)
   } catch {
-    const start = normalized.indexOf('{')
-    const end = normalized.lastIndexOf('}')
+    const jsonText = extractJsonObjectText(normalized)
 
-    if (start === -1 || end === -1 || end <= start) {
-      throw new Error('Gemmaの返答をJSONとして読み取れませんでした')
+    if (!jsonText) {
+      throw new Error(errorMessage)
     }
 
-    return JSON.parse(normalized.slice(start, end + 1))
+    return JSON.parse(repairModelJson(jsonText))
   }
 }
 
-function normalizeFoodCandidates(payload: unknown): ReceiptIngredientCandidate[] {
+function repairModelJson(text: string) {
+  return text
+    .replace(/,\s*(?:\.{3}|…)\s*(?=[}\]])/g, '')
+    .replace(/(?:\.{3}|…)\s*,?/g, '')
+    .replace(/,\s*([}\]])/g, '$1')
+    .trim()
+}
+
+function extractJsonObjectText(text: string) {
+  const start = text.indexOf('{')
+
+  if (start === -1) {
+    return null
+  }
+
+  let depth = 0
+  let isInString = false
+  let isEscaped = false
+
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index]
+
+    if (isEscaped) {
+      isEscaped = false
+      continue
+    }
+
+    if (char === '\\') {
+      isEscaped = true
+      continue
+    }
+
+    if (char === '"') {
+      isInString = !isInString
+      continue
+    }
+
+    if (isInString) {
+      continue
+    }
+
+    if (char === '{') {
+      depth += 1
+    }
+
+    if (char === '}') {
+      depth -= 1
+
+      if (depth === 0) {
+        return text.slice(start, index + 1)
+      }
+    }
+  }
+
+  return null
+}
+
+function normalizeFoodCandidates(
+  payload: unknown,
+  recognitionMemo: string,
+): ReceiptIngredientCandidate[] {
   const items = Array.isArray((payload as { items?: unknown }).items)
     ? ((payload as { items: unknown[] }).items)
     : []
@@ -101,9 +151,9 @@ function normalizeFoodCandidates(payload: unknown): ReceiptIngredientCandidate[]
         gram: Number.isFinite(gram) && gram > 0 ? Math.round(gram) : null,
         expirationDate: null,
         bestBeforeDate: null,
-        memo: String(source.memo ?? '画像認識').trim() || '画像認識',
+        memo: String(source.memo ?? recognitionMemo).trim() || recognitionMemo,
         selected: true,
-        sourceLine: '画像認識',
+        sourceLine: recognitionMemo,
       }
 
       return candidate
@@ -118,40 +168,34 @@ function normalizeFoodCandidates(payload: unknown): ReceiptIngredientCandidate[]
 export function IngredientRegisterPage({
   onNavigate,
   onLogout,
-  onContinue,
-  onContinueCandidates,
 }: IngredientRegisterPageProps) {
-  const [method, setMethod] = useState<RegisterMethod>('manual')
-  const [namesText, setNamesText] = useState(defaultNames)
+  const { t } = useI18n()
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const cameraStreamRef = useRef<MediaStream | null>(null)
+  const [method, setMethod] = useState<RegisterMethod>('receipt')
   const [statusMessage, setStatusMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [imagePreviewUrl, setImagePreviewUrl] = useState('')
   const [isRecognizing, setIsRecognizing] = useState(false)
+  const [detailItems, setDetailItems] = useState<ReceiptIngredientCandidate[]>([])
   const [recognizedItems, setRecognizedItems] = useState<
     ReceiptIngredientCandidate[]
   >([])
+  const [isCameraOpen, setIsCameraOpen] = useState(false)
 
-  function handleContinue(names: string[]) {
-    if (!names.length) {
-      setStatusMessage('食材名を1件以上入力してください')
-      return
+  useEffect(() => {
+    if (isCameraOpen && videoRef.current && cameraStreamRef.current) {
+      videoRef.current.srcObject = cameraStreamRef.current
+      void videoRef.current.play()
     }
+  }, [isCameraOpen])
 
-    setStatusMessage('')
-    setErrorMessage('')
-
-    if (onContinue) {
-      onContinue(names)
-      return
+  useEffect(() => {
+    return () => {
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
+      cameraStreamRef.current = null
     }
-
-    setStatusMessage('詳細登録画面は準備中です')
-  }
-
-  function handleManualSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    handleContinue(parseIngredientNames(namesText))
-  }
+  }, [])
 
   async function handleFoodImageChange(file: File | null) {
     if (!file) {
@@ -160,7 +204,8 @@ export function IngredientRegisterPage({
 
     setImagePreviewUrl(URL.createObjectURL(file))
     setRecognizedItems([])
-    setStatusMessage('Gemmaで食材を読み取っています...')
+    setDetailItems([])
+    setStatusMessage(t('ingredientRegister.reading'))
     setErrorMessage('')
     setIsRecognizing(true)
 
@@ -170,29 +215,101 @@ export function IngredientRegisterPage({
         prompt: foodRecognitionPrompt,
         imageBase64,
         mimeType: file.type || 'image/jpeg',
-        model: foodRecognitionModel,
+        responseMimeType: 'application/json',
       })
-      const items = normalizeFoodCandidates(parseJsonFromModel(result.text))
+      const items = normalizeFoodCandidates(
+        parseJsonFromModel(result.text, t('ingredientRegister.parseFailed')),
+        t('ingredientRegister.imageSub'),
+      )
 
       if (!items.length) {
-        setErrorMessage('食材を認識できませんでした。別の画像で試してください。')
+        setErrorMessage(t('ingredientRegister.emptyRecognition'))
         setStatusMessage('')
         return
       }
 
       setRecognizedItems(items)
-      setStatusMessage(`${items.length}件の食材候補を認識しました`)
+      setStatusMessage(
+        t('ingredientRegister.recognizedCount', { count: items.length }),
+      )
+      setIsRecognizing(false)
     } catch (error) {
       console.error('[vite] Food image recognition failed:', error)
       setErrorMessage(
         error instanceof Error
           ? error.message
-          : '食材画像の認識に失敗しました',
+          : t('ingredientRegister.failed'),
       )
       setStatusMessage('')
-    } finally {
       setIsRecognizing(false)
     }
+  }
+
+  async function startCamera() {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setErrorMessage(t('receipt.cameraUnavailable'))
+      return
+    }
+
+    setStatusMessage('')
+    setErrorMessage('')
+
+    try {
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false,
+      })
+      cameraStreamRef.current = stream
+      setIsCameraOpen(true)
+    } catch (error) {
+      console.error('[vite] Food camera start failed:', error)
+      setErrorMessage(t('receipt.cameraStartFailed'))
+    }
+  }
+
+  function stopCamera() {
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop())
+    cameraStreamRef.current = null
+    if (videoRef.current) {
+      videoRef.current.srcObject = null
+    }
+    setIsCameraOpen(false)
+  }
+
+  async function captureFoodImage() {
+    const video = videoRef.current
+
+    if (!video || !video.videoWidth || !video.videoHeight) {
+      setErrorMessage(t('receipt.cameraNotReady'))
+      return
+    }
+
+    const canvas = document.createElement('canvas')
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    const context = canvas.getContext('2d')
+
+    if (!context) {
+      setErrorMessage(t('receipt.captureFailed'))
+      return
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.92)
+    })
+
+    if (!blob) {
+      setErrorMessage(t('receipt.captureFailed'))
+      return
+    }
+
+    stopCamera()
+    await handleFoodImageChange(
+      new File([blob], `food-${Date.now()}.jpg`, { type: 'image/jpeg' }),
+    )
   }
 
   function toggleRecognizedItem(index: number, selected: boolean) {
@@ -207,31 +324,50 @@ export function IngredientRegisterPage({
     const selectedItems = recognizedItems.filter((item) => item.selected)
 
     if (!selectedItems.length) {
-      setErrorMessage('詳細登録に進む食材を選択してください')
+      setErrorMessage(t('ingredientRegister.selectRequired'))
       return
     }
 
     setErrorMessage('')
 
-    if (onContinueCandidates) {
-      onContinueCandidates(selectedItems)
-      return
-    }
+    setDetailItems(selectedItems)
+  }
 
-    handleContinue(selectedItems.map((item) => item.name))
+  function selectMethod(nextMethod: RegisterMethod) {
+    setMethod(nextMethod)
+    setStatusMessage('')
+    setErrorMessage('')
+    setDetailItems([])
+    if (nextMethod !== 'image') {
+      stopCamera()
+    }
+  }
+
+  if (detailItems.length) {
+    return (
+      <>
+        <main className="ingredient-register-page ingredient-register-page--wide">
+          <ReceiptDetailRegisterPage
+            embedded
+            items={detailItems}
+            onBack={() => setDetailItems([])}
+            onNavigate={(page) => onNavigate?.(page)}
+            onLogout={onLogout}
+          />
+        </main>
+      </>
+    )
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="ingredient-register-page">
         <div className="fridge-header">
           <div>
-            <p className="eyebrow">食材登録</p>
-            <h1>食材登録</h1>
+            <p className="eyebrow">{t('ingredientRegister.eyebrow')}</p>
+            <h1>{t('ingredientRegister.title')}</h1>
             <p className="ingredient-register-page__lead">
-              冷蔵庫に追加する食材名を入力してください。
+              {t('ingredientRegister.lead')}
             </p>
           </div>
           <button
@@ -239,7 +375,7 @@ export function IngredientRegisterPage({
             className="secondary-button back-home-button"
             onClick={() => onNavigate?.('home')}
           >
-            ホームに戻る
+            {t('common.backHome')}
           </button>
         </div>
 
@@ -255,33 +391,27 @@ export function IngredientRegisterPage({
           </p>
         ) : null}
 
-        <section className="panel register-card" aria-labelledby="input-method-title">
-          <h2 className="register-card__title" id="input-method-title">
-            登録方法を選ぶ
-          </h2>
-          <p className="register-card__desc">
-            手入力するか、レシート・食材の画像からAIで読み取って追加できます。
-          </p>
-
+        <section className="register-card" aria-label={t('ingredientRegister.methodAria')}>
           <div
             className="register-method-labels register-method-labels--two"
             role="tablist"
-            aria-label="登録方法"
+            aria-label={t('ingredientRegister.methodAria')}
           >
             <button
               type="button"
               role="tab"
-              aria-selected={method === 'manual'}
-              aria-controls="panel-manual"
+              aria-selected={method === 'receipt'}
+              aria-controls="panel-receipt"
               className={`register-method-label ${
-                method === 'manual' ? 'is-active' : ''
+                method === 'receipt' ? 'is-active' : ''
               }`}
-              onClick={() => setMethod('manual')}
+              onClick={() => selectMethod('receipt')}
             >
-              <span className="register-method-label__icon" aria-hidden="true">
-                ✏️
+              <img className="register-method-label__icon" src="/receipt.png" alt="" aria-hidden="true" />
+              {t('ingredientRegister.receipt')}
+              <span className="register-method-label__sub">
+                {t('ingredientRegister.receiptSub')}
               </span>
-              手入力
             </button>
             <button
               type="button"
@@ -291,101 +421,92 @@ export function IngredientRegisterPage({
               className={`register-method-label ${
                 method === 'image' ? 'is-active' : ''
               }`}
-              onClick={() => setMethod('image')}
+              onClick={() => selectMethod('image')}
             >
-              <span className="register-method-label__icon" aria-hidden="true">
-                📷
+              <img className="register-method-label__icon" src="/camera.png" alt="" aria-hidden="true" />
+              {t('ingredientRegister.image')}
+              <span className="register-method-label__sub">
+                {t('ingredientRegister.imageSub')}
               </span>
-              画像認識
-              <span className="register-method-label__sub">レシート・食材</span>
             </button>
           </div>
 
-          {method === 'manual' ? (
-            <div id="panel-manual" role="tabpanel" aria-labelledby="method-manual">
-              <form onSubmit={handleManualSubmit}>
-                <div className="register-field">
-                  <label htmlFor="ingredient-names">
-                    食材名（複数可） <span aria-hidden="true">*</span>
-                  </label>
-                  <textarea
-                    id="ingredient-names"
-                    name="names"
-                    value={namesText}
-                    onChange={(event) => setNamesText(event.target.value)}
-                    placeholder={'例：鮭切り身\n小松菜\n牛乳'}
-                    required
-                  />
-                  <span className="register-field__hint">
-                    複数入力する場合は改行して入力してください。
-                  </span>
+          {method === 'receipt' ? (
+            <div id="panel-receipt" role="tabpanel">
+              <ReceiptScanPage
+                embedded
+                allowManualCandidates={false}
+                onNavigate={onNavigate}
+                onLogout={onLogout}
+                onProceedToDetail={(items) => setDetailItems(items)}
+              />
+            </div>
+          ) : (
+            <div id="panel-image" role="tabpanel">
+              <div className="panel receipt-uploader">
+                <div className="section-heading">
+                  <div>
+                    <p className="eyebrow">{t('receipt.sourceEyebrow')}</p>
+                    <h2>{t('receipt.sourceTitle')}</h2>
+                  </div>
                 </div>
 
-                <div className="register-form-actions">
+                <div className="receipt-source-actions">
+                  <label className="receipt-file-field">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) =>
+                        void handleFoodImageChange(
+                          event.currentTarget.files?.[0] ?? null,
+                        )
+                      }
+                    />
+                    <span>{t('receipt.chooseImage')}</span>
+                  </label>
                   <button
                     type="button"
                     className="secondary-button"
-                    onClick={() => onNavigate?.('home')}
+                    onClick={isCameraOpen ? stopCamera : startCamera}
+                    disabled={isRecognizing}
                   >
-                    キャンセル
-                  </button>
-                  <button type="submit" className="primary-button">
-                    詳細を入力する
-                    <Icon name="arrow" />
+                    {isCameraOpen ? t('receipt.stopCamera') : t('receipt.startCamera')}
                   </button>
                 </div>
-              </form>
-            </div>
-          ) : (
-            <div id="panel-image" role="tabpanel" aria-labelledby="method-image">
-              <p className="register-image-lead">
-                レシートは専用画面へ、食材写真はこの画面でGemmaが食材候補を読み取ります。
-              </p>
-              <div className="register-upload-grid">
-                <button
-                  type="button"
-                  className="register-upload-zone"
-                  onClick={() => onNavigate?.('receipt')}
-                >
-                  <span className="register-upload-zone__badge">レシート</span>
-                  <strong>レシートを撮影</strong>
-                  <span>購入した食材をまとめて読み取り</span>
-                  <span className="register-upload-zone__note">
-                    JPEG / PNG（最大 10MB）
-                  </span>
-                </button>
-                <label className="register-upload-zone">
-                  <input
-                    className="register-upload-zone__input"
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={(event) =>
-                      void handleFoodImageChange(
-                        event.currentTarget.files?.[0] ?? null,
-                      )
-                    }
-                  />
-                  <span className="register-upload-zone__badge">食材</span>
-                  <strong>食材を撮影</strong>
-                  <span>Gemmaが食材名・カテゴリを推定</span>
-                  <span className="register-upload-zone__note">
-                    JPEG / PNG（最大 10MB）
-                  </span>
-                </label>
-              </div>
 
-              {imagePreviewUrl ? (
-                <img
-                  className="register-image-preview"
-                  src={imagePreviewUrl}
-                  alt="認識する食材画像"
-                />
-              ) : null}
+                {isCameraOpen ? (
+                  <div className="receipt-camera-panel">
+                    <video
+                      ref={videoRef}
+                      className="receipt-camera-preview"
+                      playsInline
+                      muted
+                    />
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={captureFoodImage}
+                      disabled={isRecognizing}
+                    >
+                      {t('receipt.capture')}
+                    </button>
+                  </div>
+                ) : null}
+
+                {imagePreviewUrl ? (
+                  <img
+                    className="receipt-preview"
+                    src={imagePreviewUrl}
+                    alt={t('ingredientRegister.previewAlt')}
+                  />
+                ) : (
+                  <div className="receipt-placeholder">{t('receipt.noImage')}</div>
+                )}
+              </div>
 
               {recognizedItems.length ? (
                 <div className="register-recognition-result">
-                  <h3>認識した食材候補</h3>
+                  <h3>{t('ingredientRegister.resultTitle')}</h3>
                   <div className="register-recognition-list">
                     {recognizedItems.map((item, index) => (
                       <label
@@ -406,8 +527,8 @@ export function IngredientRegisterPage({
                           <strong>{item.name}</strong>
                           <small>
                             {item.category}
-                            {item.quantity ? ` / ${item.quantity}個` : ''}
-                            {item.gram ? ` / ${item.gram}g/ml` : ''}
+                            {item.quantity ? ` / ${item.quantity}` : ''}
+                            {item.gram ? ` / ${item.gram}g` : ''}
                           </small>
                         </span>
                       </label>
@@ -420,9 +541,15 @@ export function IngredientRegisterPage({
                 <button
                   type="button"
                   className="secondary-button"
-                  onClick={() => onNavigate?.('home')}
+                  onClick={() => {
+                    setRecognizedItems([])
+                    setImagePreviewUrl('')
+                    setStatusMessage('')
+                    setErrorMessage('')
+                    stopCamera()
+                  }}
                 >
-                  キャンセル
+                  {t('common.cancel')}
                 </button>
                 <button
                   type="button"
@@ -430,7 +557,9 @@ export function IngredientRegisterPage({
                   onClick={continueWithRecognizedItems}
                   disabled={isRecognizing || !recognizedItems.length}
                 >
-                  {isRecognizing ? '認識中...' : '詳細を入力する'}
+                  {isRecognizing
+                    ? t('ingredientRegister.recognizing')
+                    : t('ingredientRegister.detailButton')}
                   <Icon name="arrow" />
                 </button>
               </div>
@@ -438,6 +567,6 @@ export function IngredientRegisterPage({
           )}
         </section>
       </main>
-    </div>
+    </>
   )
 }

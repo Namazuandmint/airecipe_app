@@ -10,17 +10,15 @@
     "dev": "node scripts/dev.js",
     "dev:vite": "vite",
     "dev:api": "node server/index.js",
-    "build": "vite build",
+    "build": "vite build --emptyOutDir",
     "typecheck": "tsc -b",
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.106.0",
-    "pg": "^8.21.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
-    "react-router-dom": "^7.15.1",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {

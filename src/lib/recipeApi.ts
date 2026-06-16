@@ -1,41 +1,6 @@
-import type { Ingredient, Recipe } from '../types/ui'
 import type { LanguageCode } from './i18n'
-
-type ApiResponse<T> =
-  | ({ ok: true } & T)
-  | {
-      ok: false
-      message?: string
-    }
-
-async function readJson<T>(response: Response): Promise<T> {
-  const responseText = await response.text()
-  let payload: ApiResponse<T>
-
-  try {
-    payload = responseText
-      ? (JSON.parse(responseText) as ApiResponse<T>)
-      : ({ ok: false, message: response.statusText } as ApiResponse<T>)
-  } catch {
-    throw new Error(
-      responseText
-        ? `API response was not JSON: ${responseText.slice(0, 120)}`
-        : response.statusText,
-    )
-  }
-
-  if (!response.ok) {
-    throw new Error(
-      'message' in payload ? (payload.message ?? response.statusText) : response.statusText,
-    )
-  }
-
-  if (!payload.ok) {
-    throw new Error((payload as { message?: string }).message ?? response.statusText)
-  }
-
-  return payload as T
-}
+import { deleteJson, getJson, patchJson, postJson } from './apiClient'
+import type { Ingredient, Recipe } from '../types/ui'
 
 function withLanguage(path: string, language?: LanguageCode) {
   if (!language) {
@@ -47,13 +12,10 @@ function withLanguage(path: string, language?: LanguageCode) {
 }
 
 export async function fetchInventory(language?: LanguageCode) {
-  const response = await fetch(withLanguage('/api/inventory', language), {
-    credentials: 'same-origin',
-  })
-  return readJson<{
+  return getJson<{
     userId: string
     inventory: Ingredient[]
-  }>(response)
+  }>(withLanguage('/api/inventory', language))
 }
 
 export type InventoryMutationInput = {
@@ -68,69 +30,36 @@ export type InventoryMutationInput = {
   memo?: string | null
 }
 
-export async function createInventoryItem(item: InventoryMutationInput) {
-  const response = await fetch('/api/inventory', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(item),
-  })
-
-  const result = await readJson<{
-    userId: string
-    inventory: Ingredient[]
-  }>(response)
-
+function dispatchInventoryUpdated() {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('inventory-updated'))
   }
+}
 
+export async function createInventoryItem(item: InventoryMutationInput) {
+  const result = await postJson<{
+    userId: string
+    inventory: Ingredient[]
+  }>('/api/inventory', item)
+  dispatchInventoryUpdated()
   return result
 }
 
 export async function updateInventoryItem(item: InventoryMutationInput) {
-  const response = await fetch('/api/inventory', {
-    method: 'PATCH',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(item),
-  })
-
-  const result = await readJson<{
+  const result = await patchJson<{
     userId: string
     inventory: Ingredient[]
-  }>(response)
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('inventory-updated'))
-  }
-
+  }>('/api/inventory', item)
+  dispatchInventoryUpdated()
   return result
 }
 
 export async function deleteInventoryItem(inventoryId: number) {
-  const response = await fetch('/api/inventory', {
-    method: 'DELETE',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ inventoryId }),
-  })
-
-  const result = await readJson<{
+  const result = await deleteJson<{
     userId: string
     inventory: Ingredient[]
-  }>(response)
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('inventory-updated'))
-  }
-
+  }>(`/api/inventory/${encodeURIComponent(String(inventoryId))}`)
+  dispatchInventoryUpdated()
   return result
 }
 
@@ -138,24 +67,23 @@ export async function generateRecipes(
   servings = 2,
   language?: LanguageCode,
   avoidedIngredients?: string,
+  cookingRequest?: string,
+  seasoningMode?: 'unlimited' | 'strict',
 ) {
-  const response = await fetch('/api/recipes/generate', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      servings,
-      language,
-      avoidedIngredients,
-    }),
-  })
-
-  return readJson<{
+  const result = await postJson<{
     userId: string
     recipes: Recipe[]
-  }>(response)
+    modelProvider?: 'gemini' | 'groq'
+    modelName?: string
+  }>('/api/recipes/generate', {
+    servings,
+    language,
+    avoidedIngredients,
+    cookingRequest,
+    seasoningMode,
+  })
+  dispatchInventoryUpdated()
+  return result
 }
 
 export async function markRecipeCooked(
@@ -163,74 +91,63 @@ export async function markRecipeCooked(
   servings: number,
   language?: LanguageCode,
 ) {
-  const response = await fetch('/api/recipes/cooked', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      recipeId,
-      servings,
-      language,
-    }),
-  })
-
-  const result = await readJson<{
+  const result = await postJson<{
     userId: string
     recipeId: string
     servings: number
     inventory: Ingredient[]
-  }>(response)
-
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('inventory-updated'))
-  }
-
+  }>('/api/recipes/cooked', {
+    recipeId,
+    servings,
+    language,
+  })
+  dispatchInventoryUpdated()
   return result
 }
 
 export async function fetchCookingHistory(language?: LanguageCode) {
-  const response = await fetch(withLanguage('/api/cooking-history', language), {
-    cache: 'no-store',
-    credentials: 'same-origin',
-  })
-  return readJson<{
+  return getJson<{
     userId: string
     recipes: Recipe[]
-  }>(response)
+  }>(withLanguage('/api/cooking-history', language))
 }
 
 export async function fetchSavedRecipes(language?: LanguageCode) {
-  const response = await fetch(withLanguage('/api/recipes/saved', language), {
-    cache: 'no-store',
-    credentials: 'same-origin',
-  })
-  return readJson<{
+  return getJson<{
     userId: string
     recipes: Recipe[]
-  }>(response)
+  }>(withLanguage('/api/recipes/saved', language))
+}
+
+export async function deleteSavedRecipe(
+  recipeId: string,
+  language?: LanguageCode,
+) {
+  const result = await deleteJson<{
+    userId: string
+    recipes: Recipe[]
+  }>(
+    withLanguage(
+      `/api/recipes/saved/${encodeURIComponent(recipeId)}`,
+      language,
+    ),
+  )
+  dispatchInventoryUpdated()
+  return result
 }
 
 export async function setRecipeFavorite(
   recipeId: string,
   isFavorite: boolean,
 ) {
-  const response = await fetch('/api/recipes/favorite', {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      recipeId,
-      isFavorite,
-    }),
-  })
-
-  return readJson<{
+  const result = await postJson<{
     userId: string
     recipeId: string
     isFavorite: boolean
-  }>(response)
+  }>('/api/recipes/favorite', {
+    recipeId,
+    isFavorite,
+  })
+  dispatchInventoryUpdated()
+  return result
 }

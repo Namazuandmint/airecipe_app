@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Topbar } from '../components/Topbar'
 import { generateGeminiContent } from '../lib/geminiApi'
 import { useI18n } from '../lib/useI18n'
 import type { AppDestination } from '../types/ui'
@@ -8,8 +7,6 @@ type GeminiTestPageProps = {
   onNavigate?: (page: AppDestination) => void
   onLogout?: () => void | Promise<void>
 }
-
-const geminiTestModel = 'gemma-4-31b-it'
 
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -22,7 +19,6 @@ function readFileAsDataUrl(file: File) {
 
 export function GeminiTestPage({
   onNavigate,
-  onLogout,
 }: GeminiTestPageProps) {
   const { t } = useI18n()
   const [prompt, setPrompt] = useState(t('gemini.promptDefault'))
@@ -83,7 +79,6 @@ export function GeminiTestPage({
         prompt,
         imageBase64,
         mimeType: imageMimeType,
-        model: geminiTestModel,
       })
 
       setResponseText(result.text || t('gemini.noText'))
@@ -92,21 +87,19 @@ export function GeminiTestPage({
       setStatusMessage(
         t('gemini.success', { model: result.model }),
       )
+      setIsSending(false)
     } catch (error) {
       console.error('[vite] Gemini test failed:', error)
       setErrorMessage(
         error instanceof Error ? error.message : t('gemini.failed'),
       )
       setStatusMessage('')
-    } finally {
       setIsSending(false)
     }
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="test-page">
         <div className="fridge-header">
           <div>
@@ -133,7 +126,7 @@ export function GeminiTestPage({
 
             <div className="test-model-label">
               <span>{t('gemini.model')}</span>
-              <strong>{geminiTestModel}</strong>
+              <strong>auto fallback</strong>
             </div>
 
             <label>
@@ -218,6 +211,6 @@ export function GeminiTestPage({
           </div>
         </section>
       </main>
-    </div>
+    </>
   )
 }

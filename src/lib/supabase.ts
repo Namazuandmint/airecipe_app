@@ -3,20 +3,19 @@ type SupabaseStatus = {
   configured: boolean
   message: string
 }
-//テストささaaaa
+
 export async function checkSupabaseConnection(): Promise<SupabaseStatus> {
   try {
-    const response = await fetch('/api/supabase/status')
-
-    if (!response.ok) {
-      return {
-        ok: false,
-        configured: false,
-        message: 'Supabase status API failed',
+    return await fetch('/api/supabase/status').then(async (response) => {
+      if (!response.ok) {
+        return {
+          ok: false,
+          configured: false,
+          message: 'Supabase status API failed',
+        }
       }
-    }
-
-    return (await response.json()) as SupabaseStatus
+      return (await response.json()) as SupabaseStatus
+    })
   } catch {
     return {
       ok: false,
@@ -26,6 +25,8 @@ export async function checkSupabaseConnection(): Promise<SupabaseStatus> {
   }
 }
 
-void checkSupabaseConnection().then((status) => {
-  console.info(`[vite] ${status.message}`)
-})
+if (import.meta.env.DEV) {
+  void checkSupabaseConnection().then((status) => {
+    console.info(`[vite] ${status.message}`)
+  })
+}

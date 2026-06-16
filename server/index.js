@@ -8,10 +8,13 @@ import {
 import {
   checkGeminiConnection,
   generateGeminiContent,
+  getGeminiUsageSnapshot,
 } from './gemini.js'
 import {
+  AuthError,
   createSessionFromTokens,
   createGoogleLoginUrl,
+  ensurePublicUser,
   getUserFromAccessToken,
   refreshSessionFromRefreshToken,
   sendPasswordResetEmail,
@@ -22,6 +25,7 @@ import {
 import {
   createInventoryItemForUser,
   deleteInventoryItemForUser,
+  deleteSavedRecipeForUser,
   generateAndSaveRecipes,
   getCookingHistoryForUser,
   getInventoryForUser,
@@ -40,6 +44,13 @@ import {
   getUserPreferences,
   updateUserPreferences,
 } from './preferences.js'
+import {
+  getContactMessagesForAdmin,
+  getMessagesForUser,
+  markMessagesReadForUser,
+  sendContactReplyForAdmin,
+  submitContactMessageForUser,
+} from './contact.js'
 import { checkSupabaseConnection } from './supabase.js'
 
 const port = Number(process.env.PORT ?? 8787)
@@ -81,19 +92,6 @@ function parseCookies(cookieHeader = '') {
 function isLocalRequest(request) {
   const host = request.headers.host ?? ''
   return host.startsWith('localhost') || host.startsWith('127.0.0.1')
-}
-
-function isLocalOrigin(origin) {
-  if (!origin) {
-    return false
-  }
-
-  try {
-    const url = new URL(origin)
-    return url.hostname === 'localhost' || url.hostname === '127.0.0.1'
-  } catch {
-    return false
-  }
 }
 
 function serializeCookie(request, name, value, options = {}) {
@@ -149,41 +147,54 @@ function createClearAuthCookieHeaders(request) {
 }
 
 function getRequestOrigin(request, requestedOrigin) {
-  const origin = request.headers.origin
-
-  if (isLocalOrigin(origin)) {
-    return origin.replace(/\/$/, '')
-  }
-
-  if (isLocalRequest(request) && isLocalOrigin(requestedOrigin)) {
-    return requestedOrigin.replace(/\/$/, '')
-  }
-
-  const explicitAppUrl =
-    process.env.APP_URL ??
-    process.env.PUBLIC_APP_URL ??
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : null)
-
-  if (explicitAppUrl) {
-    return explicitAppUrl.replace(/\/$/, '')
-  }
-
-  if (origin) {
-    return origin.replace(/\/$/, '')
-  }
-
   const forwardedProto = request.headers['x-forwarded-proto']
   const forwardedHost = request.headers['x-forwarded-host']
   const host = forwardedHost ?? request.headers.host
 
-  if (!host) {
-    return null
+  if (host) {
+    const proto = forwardedProto ?? (isLocalRequest(request) ? 'http' : 'https')
+    return `${proto}://${host}`.replace(/\/$/, '')
   }
 
-  const proto =
-    forwardedProto ?? (isLocalRequest(request) ? 'http' : 'https')
+  if (requestedOrigin) {
+    return requestedOrigin.replace(/\/$/, '')
+  }
 
-  return `${proto}://${host}`.replace(/\/$/, '')
+  return null
+}
+
+// Whitelist redirect targets to prevent open-redirect attacks.
+// Accepts: missing/null, relative paths (/foo, foo/bar), or absolute URLs
+// whose origin matches the current request origin.
+function resolveSafeRedirect(request, redirectTo) {
+  const requestOrigin = getRequestOrigin(request, null)
+
+  if (!redirectTo) {
+    return requestOrigin
+  }
+
+  if (typeof redirectTo !== 'string') {
+    return requestOrigin
+  }
+
+  if (redirectTo.startsWith('/') && !redirectTo.startsWith('//')) {
+    return redirectTo
+  }
+
+  try {
+    const parsed = new URL(redirectTo)
+
+    if (requestOrigin) {
+      const targetOrigin = `${parsed.protocol}//${parsed.host}`.replace(/\/$/, '')
+      if (targetOrigin === requestOrigin) {
+        return redirectTo
+      }
+    }
+  } catch {
+    // Fall through to request origin.
+  }
+
+  return requestOrigin
 }
 
 async function requireAuthenticatedUser(request) {
@@ -193,7 +204,9 @@ async function requireAuthenticatedUser(request) {
 
   if (accessToken) {
     try {
-      const user = await getUserFromAccessToken(accessToken)
+      const user = await ensurePublicUser(
+        await getUserFromAccessToken(accessToken),
+      )
 
       if (user?.id) {
         return {
@@ -201,19 +214,23 @@ async function requireAuthenticatedUser(request) {
           session: null,
         }
       }
-    } catch {
-      // Try the refresh token below before treating the request as anonymous.
+    } catch (error) {
+      // Only treat access-token errors as transient. Re-throw infrastructure
+      // failures (Supabase down, etc.) so the handler returns 5xx, not 401.
+      if (!(error instanceof AuthError)) {
+        throw error
+      }
     }
   }
 
   if (!refreshToken) {
-    throw new Error('Login is required')
+    throw new AuthError()
   }
 
   const result = await refreshSessionFromRefreshToken(refreshToken)
 
   if (!result.user?.id) {
-    throw new Error('Login is required')
+    throw new AuthError()
   }
 
   return {
@@ -255,6 +272,14 @@ export async function handleApiRequest(request, response) {
   if (request.method === 'GET' && url.pathname === '/api/gemini/status') {
     const status = checkGeminiConnection()
     sendJson(response, status.ok ? 200 : 500, status)
+    return
+  }
+
+  if (request.method === 'GET' && url.pathname === '/api/gemini/usage') {
+    sendJson(response, 200, {
+      ok: true,
+      usage: getGeminiUsageSnapshot(),
+    })
     return
   }
 
@@ -310,10 +335,21 @@ export async function handleApiRequest(request, response) {
         authResult.session,
       )
     }
-  } catch {
-    sendJson(response, 401, {
+  } catch (error) {
+    if (error instanceof AuthError) {
+      sendJson(response, 401, {
+        ok: false,
+        message: 'Login is required',
+      })
+      return
+    }
+
+    sendJson(response, 500, {
       ok: false,
-      message: 'Login is required',
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Internal server error',
     })
     return
   }
@@ -333,8 +369,12 @@ export async function handleApiRequest(request, response) {
     return
   }
 
-  if (request.method === 'DELETE' && url.pathname === '/api/inventory') {
-    await handleInventoryDelete(request, response, authUser.id)
+  const inventoryDeleteMatch =
+    request.method === 'DELETE' &&
+    url.pathname.match(/^\/api\/inventory\/(\d+)$/)
+  if (inventoryDeleteMatch) {
+    const inventoryId = Number(inventoryDeleteMatch[1])
+    await handleInventoryDelete(request, response, authUser.id, inventoryId)
     return
   }
 
@@ -345,6 +385,34 @@ export async function handleApiRequest(request, response) {
 
   if (request.method === 'PATCH' && url.pathname === '/api/preferences') {
     await handlePreferencesUpdate(request, response, authUser.id)
+    return
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/contact') {
+    await handleContactSubmit(request, response, authUser)
+    return
+  }
+
+  if (request.method === 'GET' && url.pathname === '/api/admin/contact-messages') {
+    await handleAdminContactMessages(authUser, response)
+    return
+  }
+
+  if (
+    request.method === 'POST' &&
+    url.pathname === '/api/admin/contact-messages/reply'
+  ) {
+    await handleAdminContactReply(request, response, authUser)
+    return
+  }
+
+  if (request.method === 'GET' && url.pathname === '/api/messages') {
+    await handleUserMessages(authUser.id, response)
+    return
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/messages/read') {
+    await handleUserMessagesRead(request, response, authUser.id)
     return
   }
 
@@ -359,6 +427,19 @@ export async function handleApiRequest(request, response) {
 
   if (request.method === 'GET' && url.pathname === '/api/recipes/saved') {
     await handleSavedRecipes(
+      authUser.id,
+      response,
+      url.searchParams.get('language'),
+    )
+    return
+  }
+
+  const savedRecipeDeleteMatch = url.pathname.match(
+    /^\/api\/recipes\/saved\/([^/]+)$/,
+  )
+  if (request.method === 'DELETE' && savedRecipeDeleteMatch) {
+    await handleDeleteSavedRecipe(
+      savedRecipeDeleteMatch[1],
       authUser.id,
       response,
       url.searchParams.get('language'),
@@ -471,6 +552,7 @@ async function handleGeminiGenerate(request, response) {
       prompt: body?.prompt,
       imageBase64: body?.imageBase64,
       mimeType: body?.mimeType,
+      responseMimeType: body?.responseMimeType,
       model: body?.model,
     })
 
@@ -479,10 +561,19 @@ async function handleGeminiGenerate(request, response) {
       ...result,
     })
   } catch (error) {
-    sendJson(response, 500, {
+    const statusCode = Number.isInteger(error?.statusCode)
+      ? error.statusCode
+      : 500
+
+    sendJson(response, statusCode, {
       ok: false,
       message:
         error instanceof Error ? error.message : 'Gemini request failed',
+      attemptedModels: error?.attemptedModels,
+      skippedModels: error?.skippedModels,
+      modelErrors: error?.modelErrors,
+      usage: error?.usage ?? getGeminiUsageSnapshot(),
+      retryAfterMs: error?.retryAfterMs,
     })
   }
 }
@@ -560,8 +651,7 @@ async function handleAuthRegister(request, response) {
 async function handleAuthGoogle(request, response) {
   try {
     const body = await readJsonBody(request)
-    const redirectTo =
-      getRequestOrigin(request, body?.redirectTo) ?? body?.redirectTo
+    const redirectTo = resolveSafeRedirect(request, body?.redirectTo)
     const result = await createGoogleLoginUrl({
       redirectTo,
     })
@@ -622,10 +712,21 @@ async function handleAuthMe(request, response) {
       ok: true,
       user: authResult.user,
     })
-  } catch {
-    sendJson(response, 401, {
+  } catch (error) {
+    if (error instanceof AuthError) {
+      sendJson(response, 401, {
+        ok: false,
+        message: 'Login is required',
+      })
+      return
+    }
+
+    sendJson(response, 500, {
       ok: false,
-      message: 'Login is required',
+      message:
+        error instanceof Error
+          ? error.message
+          : 'Internal server error',
     })
   }
 }
@@ -655,7 +756,7 @@ async function handleAuthPasswordReset(request, response) {
 
     const result = await sendPasswordResetEmail({
       email: body.email,
-      redirectTo: getRequestOrigin(request, body?.redirectTo) ?? body?.redirectTo,
+      redirectTo: resolveSafeRedirect(request, body?.redirectTo),
     })
 
     sendJson(response, 200, {
@@ -787,12 +888,11 @@ async function handleInventoryUpdate(request, response, userId) {
   }
 }
 
-async function handleInventoryDelete(request, response, userId) {
+async function handleInventoryDelete(request, response, userId, inventoryId) {
   try {
-    const body = await readJsonBody(request)
     const result = await deleteInventoryItemForUser({
       userId,
-      inventoryId: body?.inventoryId,
+      inventoryId,
     })
 
     sendJson(response, 200, {
@@ -874,16 +974,124 @@ async function handlePreferencesUpdate(request, response, userId) {
   }
 }
 
+async function handleContactSubmit(request, response, user) {
+  try {
+    const body = await readJsonBody(request)
+    const contactMessage = await submitContactMessageForUser(user, {
+      ...body,
+      userAgent: request.headers['user-agent'] ?? null,
+    })
+
+    sendJson(response, 200, {
+      ok: true,
+      contactMessage,
+    })
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Contact request failed'
+    const statusCode = /required/.test(message) ? 400 : 500
+
+    sendJson(response, statusCode, {
+      ok: false,
+      message,
+    })
+  }
+}
+
+async function handleAdminContactMessages(user, response) {
+  try {
+    const contactMessages = await getContactMessagesForAdmin(user)
+
+    sendJson(response, 200, {
+      ok: true,
+      contactMessages,
+    })
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Admin contact request failed'
+    const statusCode = /Admin permission/.test(message) ? 403 : 500
+
+    sendJson(response, statusCode, {
+      ok: false,
+      message,
+    })
+  }
+}
+
+async function handleAdminContactReply(request, response, user) {
+  try {
+    const body = await readJsonBody(request)
+    const userMessages = await sendContactReplyForAdmin(user, body)
+
+    sendJson(response, 200, {
+      ok: true,
+      userMessages,
+    })
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : 'Admin contact reply failed'
+    const statusCode = /Admin permission/.test(message)
+      ? 403
+      : /required|missing/.test(message)
+        ? 400
+        : 500
+
+    sendJson(response, statusCode, {
+      ok: false,
+      message,
+    })
+  }
+}
+
+async function handleUserMessages(userId, response) {
+  try {
+    const messages = await getMessagesForUser(userId)
+
+    sendJson(response, 200, {
+      ok: true,
+      messages,
+    })
+  } catch (error) {
+    sendJson(response, 500, {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : 'Messages request failed',
+    })
+  }
+}
+
+async function handleUserMessagesRead(request, response, userId) {
+  try {
+    const body = await readJsonBody(request)
+    const messages = await markMessagesReadForUser(userId, body?.messageIds)
+
+    sendJson(response, 200, {
+      ok: true,
+      messages,
+    })
+  } catch (error) {
+    sendJson(response, 500, {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : 'Messages update failed',
+    })
+  }
+}
+
 async function handleRecipeGeneration(request, response, userId) {
   let body = null
 
   try {
     body = await readJsonBody(request)
+    const { preferences } = await getUserPreferences(userId)
     const result = await generateAndSaveRecipes({
       userId,
       servings: body?.servings,
       language: body?.language,
       avoidedIngredients: body?.avoidedIngredients,
+      cookingRequest: body?.cookingRequest,
+      modelChoice: preferences.recipeModel,
+      seasoningMode: body?.seasoningMode,
     })
 
     sendJson(response, 200, {
@@ -948,6 +1156,28 @@ async function handleSavedRecipes(userId, response, language) {
   }
 }
 
+async function handleDeleteSavedRecipe(recipeId, userId, response, language) {
+  try {
+    const recipes = await deleteSavedRecipeForUser({
+      recipeId: decodeURIComponent(recipeId),
+      userId,
+      language,
+    })
+    sendJson(response, 200, {
+      ok: true,
+      ...recipes,
+    })
+  } catch (error) {
+    const statusCode =
+      error instanceof Error && error.message === 'Recipe not found' ? 404 : 500
+    sendJson(response, statusCode, {
+      ok: false,
+      message:
+        error instanceof Error ? error.message : 'Saved recipe delete failed',
+    })
+  }
+}
+
 async function handleRecipeCooked(request, response, userId) {
   try {
     const body = await readJsonBody(request)
@@ -1003,6 +1233,7 @@ async function handleReceiptParse(request, response) {
     body = await readJsonBody(request)
     const result = await parseReceiptText({
       ocrText: body?.ocrText,
+      registrationDate: body?.registrationDate,
     })
 
     sendJson(response, 200, {

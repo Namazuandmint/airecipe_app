@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Topbar } from '../components/Topbar'
 import { Icon } from '../components/Icon'
 import { markRecipeCooked, setRecipeFavorite } from '../lib/recipeApi'
 import { useI18n } from '../lib/useI18n'
@@ -16,9 +15,7 @@ type RecipeDetailPageProps = {
 export function RecipeDetailPage({
   recipe,
   onBack,
-  onNavigate,
   onInventoryUpdated,
-  onLogout,
 }: RecipeDetailPageProps) {
   const { language, t } = useI18n()
   const [servings, setServings] = useState(1)
@@ -54,10 +51,10 @@ export function RecipeDetailPage({
       const result = await markRecipeCooked(recipe.recipeId, servings, language)
       onInventoryUpdated?.(result.inventory)
       setMessage(t('recipe.inventoryUpdated', { servings }))
+      setIsCooking(false)
     } catch (error) {
       console.error('[vite] Cooking update failed:', error)
       setMessage(t('recipe.inventoryUpdateFailed'))
-    } finally {
       setIsCooking(false)
     }
   }
@@ -80,18 +77,16 @@ export function RecipeDetailPage({
           ? t('recipe.favoriteAdded')
           : t('recipe.favoriteRemoved'),
       )
+      setIsUpdatingFavorite(false)
     } catch (error) {
       console.error('[vite] Favorite update failed:', error)
       setMessage(t('recipe.favoriteUpdateFailed'))
-    } finally {
       setIsUpdatingFavorite(false)
     }
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="recipe-detail">
         <div className="recipe-detail__toolbar">
           <button type="button" className="secondary-button" onClick={onBack}>
@@ -145,8 +140,10 @@ export function RecipeDetailPage({
 
             {recipe.ingredients?.length ? (
               <ul className="detail-list">
-                {recipe.ingredients.map((ingredient) => (
-                  <li key={ingredient.ingredientId}>
+                {recipe.ingredients.map((ingredient, index) => (
+                  <li
+                    key={`${ingredient.ingredientId}-${ingredient.name}-${index}`}
+                  >
                     <span>{ingredient.name}</span>
                     <strong>
                       {ingredient.amount}
@@ -203,6 +200,6 @@ export function RecipeDetailPage({
           </button>
         </section>
       </main>
-    </div>
+    </>
   )
 }

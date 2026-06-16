@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { IconName } from '../types/ui'
 
 const iconPaths: Record<IconName, string[]> = {
@@ -25,7 +26,7 @@ const iconPaths: Record<IconName, string[]> = {
   ],
   settings: [
     'M12 8.75a3.25 3.25 0 1 1 0 6.5 3.25 3.25 0 0 1 0-6.5z',
-    'M19.25 13.5v-3l-2.05-.5a6.2 6.2 0 0 0-.7-1.68l1.1-1.8-2.12-2.12-1.8 1.1a6.2 6.2 0 0 0-1.68-.7l-.5-2.05h-3l-.5 2.05a6.2 6.2 0 0 0-1.68.7l-1.8-1.1L2.4 6.52l1.1 1.8A6.2 6.2 0 0 0 2.8 10l-2.05.5v3l2.05.5c.17.6.4 1.17.7 1.68l-1.1 1.8 2.12 2.12 1.8-1.1c.51.3 1.08.53 1.68.7l.5 2.05h3l.5-2.05c.6-.17 1.17-.4 1.68-.7l1.8 1.1 2.12-2.12-1.1-1.8c.3-.51.53-1.08.7-1.68l2.05-.5z',
+    'M21.25 13.5v-3l-2.05-.5a6.2 6.2 0 0 0-.7-1.68l1.1-1.8-2.12-2.12-1.8 1.1a6.2 6.2 0 0 0-1.68-.7l-.5-2.05h-3l-.5 2.05a6.2 6.2 0 0 0-1.68.7l-1.8-1.1L4.4 6.52l1.1 1.8A6.2 6.2 0 0 0 4.8 10l-2.05.5v3l2.05.5c.17.6.4 1.17.7 1.68l-1.1 1.8 2.12 2.12 1.8-1.1c.51.3 1.08.53 1.68.7l.5 2.05h3l.5-2.05c.6-.17 1.17-.4 1.68-.7l1.8 1.1 2.12-2.12-1.1-1.8c.3-.51.53-1.08.7-1.68l2.05-.5z',
   ],
   bell: [
     'M17.5 15.25H6.5l1.2-1.8V10a4.3 4.3 0 0 1 8.6 0v3.45l1.2 1.8z',
@@ -40,7 +41,7 @@ const iconPaths: Record<IconName, string[]> = {
   arrow: ['M5 12h14M13 6l6 6-6 6'],
 }
 
-export function Icon({ name }: { name: IconName }) {
+export const Icon = memo(function Icon({ name }: { name: IconName }) {
   return (
     <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">
       {iconPaths[name].map((path) => (
@@ -48,4 +49,4 @@ export function Icon({ name }: { name: IconName }) {
       ))}
     </svg>
   )
-}
+})

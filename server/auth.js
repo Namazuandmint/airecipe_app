@@ -83,6 +83,15 @@ function normalizeUser(user) {
   return {
     id: user.id,
     email: user.email,
+    isAdmin: Boolean(user.isAdmin),
+  }
+}
+
+export class AuthError extends Error {
+  constructor(message = 'Login is required', statusCode = 401) {
+    super(message)
+    this.name = 'AuthError'
+    this.statusCode = statusCode
   }
 }
 
@@ -90,7 +99,7 @@ function getFallbackEmail(userId) {
   return `user-${userId}@aicook.local`
 }
 
-async function ensurePublicUser(user) {
+export async function ensurePublicUser(user) {
   if (!user?.id) {
     return null
   }
@@ -114,7 +123,27 @@ async function ensurePublicUser(user) {
     throw new Error(`Failed to sync public user: ${error.message}`)
   }
 
-  return user
+  const { data: publicUser, error: fetchError } = await client
+    .from('users')
+    .select('is_admin')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (fetchError?.code === '42703') {
+    return {
+      ...user,
+      isAdmin: false,
+    }
+  }
+
+  if (fetchError) {
+    throw new Error(`Failed to fetch public user: ${fetchError.message}`)
+  }
+
+  return {
+    ...user,
+    isAdmin: Boolean(publicUser?.is_admin),
+  }
 }
 
 function normalizeSession(session) {
@@ -130,7 +159,9 @@ function normalizeSession(session) {
   }
 }
 
-function decodeJwtPayload(accessToken) {
+// Reads the JWT payload without verifying the signature. Only used to
+// extract `exp` for cookie max-age. Do not use for any trust decision.
+function decodeJwtPayloadForExpiration(accessToken) {
   const [, payload] = String(accessToken).split('.')
 
   if (!payload) {
@@ -233,7 +264,7 @@ export async function createSessionFromTokens({ accessToken, refreshToken }) {
   }
 
   const user = await ensurePublicUser(await getUserFromAccessToken(accessToken))
-  const payload = decodeJwtPayload(accessToken)
+  const payload = decodeJwtPayloadForExpiration(accessToken)
   const timeNow = Math.floor(Date.now() / 1000)
   const expiresAt = Number.isFinite(payload.exp) ? payload.exp : null
   const expiresIn = expiresAt ? Math.max(0, expiresAt - timeNow) : null
@@ -317,13 +348,13 @@ export async function getUserFromAccessToken(accessToken) {
   const client = requireAuthVerifierClient()
 
   if (!accessToken) {
-    throw new Error('access token is required')
+    throw new AuthError('access token is required')
   }
 
   const { data, error } = await client.auth.getUser(accessToken)
 
   if (error) {
-    throw new Error(error.message)
+    throw new AuthError(error.message)
   }
 
   return normalizeUser(data.user)

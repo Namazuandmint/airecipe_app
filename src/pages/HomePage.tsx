@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { FeatureCard } from '../components/FeatureCard'
 import { HeroPanel } from '../components/HeroPanel'
 import { IngredientsPanel } from '../components/IngredientsPanel'
 import { RecipesPanel } from '../components/RecipesPanel'
 import { SummaryGrid } from '../components/SummaryGrid'
-import { Topbar } from '../components/Topbar'
 import { getSecondaryFeatures } from '../data/home'
+import { getCache, setCache } from '../lib/dataCache'
 import type { TranslateFn } from '../lib/i18n'
 import { useI18n } from '../lib/useI18n'
 import {
@@ -14,6 +14,7 @@ import {
   generateRecipes,
   markRecipeCooked,
 } from '../lib/recipeApi'
+import { formatRecipeModelSource } from '../lib/recipeModelLabel'
 import {
   defaultPreferences,
   fetchPreferences,
@@ -29,6 +30,7 @@ type HomePageProps = {
   onNavigate?: (page: AppDestination) => void
   onSelectRecipe?: (recipe: Recipe) => void
   onLogout?: () => void | Promise<void>
+  onShowFavorites?: () => void
 }
 
 function isNearExpiration(ingredient: Ingredient, leadDays = 3) {
@@ -51,13 +53,6 @@ function isNearExpiration(ingredient: Ingredient, leadDays = 3) {
   return diffDays >= 0 && diffDays <= leadDays
 }
 
-// function isLowStock(ingredient: Ingredient) {
-//   const quantity = Number(ingredient.quantity ?? 0)
-//   const gram = Number(ingredient.gram ?? 0)
-
-//   return quantity <= 0 && gram <= 0
-// }
-
 function buildSummaryItems(
   ingredients: Ingredient[],
   recipes: Recipe[],
@@ -73,9 +68,6 @@ function buildSummaryItems(
           isNearExpiration(ingredient, leadDays),
         ).length
       : 0
-  // const lowStockCount = preferences.notifications.lowStock
-  //   ? ingredients.filter(isLowStock).length
-  //   : 0
   const favoriteCount = recipes.filter((recipe) => recipe.isFavorite).length
 
   return [
@@ -101,14 +93,6 @@ function buildSummaryItems(
         ? t('home.summary.recipesNote')
         : t('home.summary.recipesEmptyNote'),
     },
-    // {
-    //   label: t('home.summary.lowStockLabel'),
-    //   value: String(lowStockCount),
-    //   note:
-    //     lowStockCount > 0
-    //       ? t('home.summary.lowStockNote')
-    //       : t('home.summary.lowStockEmptyNote'),
-    // },
     {
       label: t('home.summary.favoritesLabel'),
       value: String(favoriteCount),
@@ -120,18 +104,21 @@ function buildSummaryItems(
 export function HomePage({
   onNavigate,
   onSelectRecipe,
-  onLogout,
+  onShowFavorites,
 }: HomePageProps) {
   const { language, t } = useI18n()
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [recipes, setRecipes] = useState<Recipe[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [isCooking, setIsCooking] = useState(false)
   const [statusMessage, setStatusMessage] = useState('')
+  const [toastMessage, setToastMessage] = useState('')
   const [cookingRecipe, setCookingRecipe] = useState<Recipe | null>(null)
   const [servings, setServings] = useState(1)
   const [preferences, setPreferences] =
     useState<UserPreferences>(defaultPreferences)
+  const toastTimerRef = useRef<number | null>(null)
   const secondaryFeatures = useMemo(() => getSecondaryFeatures(t), [t])
   const currentSummaryItems = useMemo(
     () => buildSummaryItems(ingredients, recipes, preferences, t),
@@ -139,49 +126,124 @@ export function HomePage({
   )
 
   useEffect(() => {
-    let isMounted = true
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current)
+        toastTimerRef.current = null
+      }
+    }
+  }, [])
 
-    fetchInventory(language)
-      .then((result) => {
-        if (isMounted) {
-          setIngredients(result.inventory)
-        }
-      })
-      .catch((error) => {
-        console.warn('[vite] Inventory fetch failed:', error)
-        if (isMounted) {
+  function showToast(message: string) {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+
+    setToastMessage(message)
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage('')
+      toastTimerRef.current = null
+    }, 2400)
+  }
+
+  useEffect(() => {
+    let isMounted = true
+    const cacheKey = `home:${language}`
+
+    const cached = getCache<{
+      ingredients: Ingredient[]
+      recipes: Recipe[]
+      preferences: UserPreferences
+    }>(cacheKey)
+    if (cached) {
+      setIngredients(cached.ingredients)
+      setRecipes(cached.recipes)
+      setPreferences(cached.preferences)
+      setIsLoading(false)
+    }
+
+    Promise.allSettled([
+      fetchInventory(language),
+      fetchSavedRecipes(language),
+      fetchPreferences(),
+    ]).then(([inventoryResult, recipesResult, preferencesResult]) => {
+      if (!isMounted) {
+        return
+      }
+
+      if (inventoryResult.status === 'fulfilled') {
+        setIngredients(inventoryResult.value.inventory)
+      } else {
+        console.warn('[vite] Inventory fetch failed:', inventoryResult.reason)
+        if (!cached) {
+          const error = inventoryResult.reason
           setStatusMessage(
             error instanceof Error
               ? error.message
               : t('home.status.inventoryFetchFailed'),
           )
         }
-      })
+      }
 
-    fetchSavedRecipes(language)
-      .then((result) => {
-        if (isMounted) {
-          setRecipes(result.recipes)
-        }
-      })
-      .catch((error) => {
-        console.warn('[vite] Saved recipes fetch failed:', error)
-      })
+      if (recipesResult.status === 'fulfilled') {
+        setRecipes(recipesResult.value.recipes)
+      } else {
+        console.warn('[vite] Saved recipes fetch failed:', recipesResult.reason)
+      }
 
-    fetchPreferences()
-      .then((result) => {
-        if (isMounted) {
-          setPreferences(result.preferences)
-        }
-      })
-      .catch((error) => {
-        console.warn('[vite] Preferences fetch failed:', error)
-      })
+      if (preferencesResult.status === 'fulfilled') {
+        setPreferences(preferencesResult.value.preferences)
+      } else {
+        console.warn('[vite] Preferences fetch failed:', preferencesResult.reason)
+      }
+
+      if (inventoryResult.status === 'fulfilled' && recipesResult.status === 'fulfilled' && preferencesResult.status === 'fulfilled') {
+        setCache(cacheKey, {
+          ingredients: inventoryResult.value.inventory,
+          recipes: recipesResult.value.recipes,
+          preferences: preferencesResult.value.preferences,
+        })
+      }
+
+      setIsLoading(false)
+    })
 
     return () => {
       isMounted = false
     }
-  }, [language, t])
+  }, [language])
+
+  useEffect(() => {
+    let isMounted = true
+
+    function handlePreferencesUpdated(event: Event) {
+      const nextPreferences = (
+        event as CustomEvent<{ preferences?: UserPreferences }>
+      ).detail?.preferences
+
+      if (nextPreferences) {
+        setPreferences(nextPreferences)
+        return
+      }
+
+      void fetchPreferences()
+        .then((result) => {
+          if (isMounted) {
+            setPreferences(result.preferences)
+          }
+        })
+        .catch((error) => {
+          console.warn('[vite] Preferences refresh failed:', error)
+        })
+    }
+
+    window.addEventListener('preferences-updated', handlePreferencesUpdated)
+
+    return () => {
+      isMounted = false
+      window.removeEventListener('preferences-updated', handlePreferencesUpdated)
+    }
+  }, [])
 
   async function handleGenerateRecipe() {
     if (!ingredients.length) {
@@ -197,18 +259,27 @@ export function HomePage({
         preferences.defaultServings,
         language,
         preferences.avoidedIngredients,
+        undefined,
+        preferences.seasoningMode,
       )
 
       if (result.recipes.length) {
         setRecipes(result.recipes)
+        const modelSource = formatRecipeModelSource(
+          result.modelProvider,
+          result.modelName,
+        )
         setStatusMessage(t('home.status.generateSuccess'))
+        if (modelSource) {
+          showToast(modelSource)
+        }
       }
+      setIsGenerating(false)
     } catch (error) {
       console.error('[vite] Recipe generation failed:', error)
       setStatusMessage(
         error instanceof Error ? error.message : t('home.status.generateFailed'),
       )
-    } finally {
       setIsGenerating(false)
     }
   }
@@ -236,6 +307,7 @@ export function HomePage({
       setIngredients(result.inventory)
       setStatusMessage(t('home.status.cookingUpdated', { servings }))
       setCookingRecipe(null)
+      setIsCooking(false)
     } catch (error) {
       console.error('[vite] Cooking update failed:', error)
       setStatusMessage(
@@ -243,19 +315,16 @@ export function HomePage({
           ? error.message
           : t('home.status.inventoryUpdateFailed'),
       )
-    } finally {
       setIsCooking(false)
     }
   }
 
   return (
-    <div className="app-shell">
-      <Topbar onNavigate={onNavigate} onLogout={onLogout} />
-
+    <>
       <main className="home">
         <HeroPanel
           isGenerating={isGenerating}
-          onGenerateRecipe={handleGenerateRecipe}
+          onGenerateRecipe={() => onNavigate?.('recipe-generate')}
           onAddIngredient={() => onNavigate?.('fridge')}
           onScanReceipt={() => onNavigate?.('ingredient-register')}
           onShowRecipes={() => onNavigate?.('history')}
@@ -267,21 +336,30 @@ export function HomePage({
           </p>
         ) : null}
 
-        <SummaryGrid items={currentSummaryItems} />
+        {isLoading ? (
+          <div className="fridge-loading">
+            <div className="loading-spinner" />
+            <p>{t('common.loading')}</p>
+          </div>
+        ) : (
+          <div className="content-appear">
+            <SummaryGrid items={currentSummaryItems} />
 
-        <div className="dashboard-grid">
-          <IngredientsPanel
-            ingredients={ingredients}
-            onAddIngredient={() => onNavigate?.('ingredient-register')}
-          />
-          <RecipesPanel
-            recipes={recipes}
-            isGenerating={isGenerating}
-            onGenerateRecipe={handleGenerateRecipe}
-            onSelectRecipe={onSelectRecipe}
-            onCookRecipe={openCookedDialog}
-          />
-        </div>
+            <div className="dashboard-grid">
+              <IngredientsPanel
+                ingredients={ingredients}
+                onAddIngredient={() => onNavigate?.('ingredient-register')}
+              />
+              <RecipesPanel
+                recipes={recipes}
+                isGenerating={isGenerating}
+                onGenerateRecipe={handleGenerateRecipe}
+                onSelectRecipe={onSelectRecipe}
+                onCookRecipe={openCookedDialog}
+              />
+            </div>
+          </div>
+        )}
 
         <section
           className="secondary-section"
@@ -296,7 +374,11 @@ export function HomePage({
                 onAction={
                   feature.icon === 'settings'
                     ? () => onNavigate?.('settings')
-                    : undefined
+                    : feature.icon === 'heart'
+                      ? onShowFavorites
+                      : feature.icon === 'message'
+                        ? () => onNavigate?.('contact')
+                        : undefined
                 }
               />
             ))}
@@ -349,6 +431,12 @@ export function HomePage({
           </section>
         </div>
       ) : null}
-    </div>
+
+      {toastMessage ? (
+        <div className="toast-message" role="status">
+          {toastMessage}
+        </div>
+      ) : null}
+    </>
   )
 }

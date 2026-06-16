@@ -1,11 +1,17 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Icon } from './Icon'
 import { useI18n } from '../lib/useI18n'
+import {
+  fetchUserMessages,
+  markUserMessagesRead,
+  type UserMessage,
+} from '../lib/contactApi'
 import { fetchInventory } from '../lib/recipeApi'
 import { fetchPreferences, defaultPreferences } from '../lib/preferencesApi'
 import type { AppDestination, Ingredient, UserPreferences } from '../types/ui'
 
 type TopbarProps = {
+  currentPage?: string
   onNavigate?: (page: AppDestination) => void
   onLogout?: () => void | Promise<void>
 }
@@ -63,6 +69,29 @@ function getDaysRemaining(dateStr: string | null | undefined) {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 }
 
+function getDaysText(days: number, t: ReturnType<typeof useI18n>['t']) {
+  if (days < 0) {
+    return t('notification.yesterdayOrBefore')
+  }
+  if (days === 0) {
+    return t('notification.today')
+  }
+  if (days === 1) {
+    return t('notification.tomorrow')
+  }
+  return t('notification.daysRemaining', { days })
+}
+
+function getDaysClass(days: number) {
+  if (days <= 0) {
+    return 'urgent'
+  }
+  if (days === 1) {
+    return 'warning'
+  }
+  return 'info'
+}
+
 function getExpiringInfo(ingredient: Ingredient, leadDays: number) {
   const expDays = getDaysRemaining(ingredient.expirationDate)
   const bbDays = getDaysRemaining(ingredient.bestBeforeDate)
@@ -86,7 +115,7 @@ function getExpiringInfo(ingredient: Ingredient, leadDays: number) {
     type = 'bestBefore'
   }
 
-  if (days === null) {
+  if (days === null || days < 0) {
     return null
   }
 
@@ -101,11 +130,12 @@ function getExpiringInfo(ingredient: Ingredient, leadDays: number) {
   return null
 }
 
-export function Topbar({ onNavigate, onLogout }: TopbarProps) {
+export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
   const { language, t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false) // 💡 スマホ用ハンバーガーメニュー開閉状態
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
+  const [userMessages, setUserMessages] = useState<UserMessage[]>([])
   const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences)
   const [viewedNotificationKeys, setViewedNotificationKeys] = useState(
     readViewedNotifications,
@@ -113,35 +143,69 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
   const notificationRef = useRef<HTMLDivElement | null>(null)
   const menuRef = useRef<HTMLDivElement | null>(null) // 💡 外側クリック検知用
 
-  const loadData = useCallback(() => {
-    fetchInventory(language)
-      .then((result) => {
-        setIngredients(result.inventory)
-      })
-      .catch((err) => {
-        console.warn('[Topbar] Failed to fetch inventory:', err)
-      })
-
-    fetchPreferences()
-      .then((result) => {
-        setPreferences(result.preferences)
-      })
-      .catch((err) => {
-        console.warn('[Topbar] Failed to fetch preferences:', err)
-      })
+  const loadInventoryAndPreferences = useCallback(() => {
+    void Promise.all([
+      fetchInventory(language)
+        .then((result) => {
+          setIngredients(result.inventory)
+        })
+        .catch((err) => {
+          console.warn('[Topbar] Failed to fetch inventory:', err)
+        }),
+      fetchPreferences()
+        .then((result) => {
+          setPreferences(result.preferences)
+        })
+        .catch((err) => {
+          console.warn('[Topbar] Failed to fetch preferences:', err)
+        }),
+    ])
   }, [language])
 
+  const loadMessages = useCallback(() => {
+    fetchUserMessages()
+      .then((result) => {
+        setUserMessages(result.messages)
+      })
+      .catch((err) => {
+        console.warn('[Topbar] Failed to fetch messages:', err)
+      })
+  }, [])
+
+  const loadAll = useCallback(() => {
+    loadInventoryAndPreferences()
+    loadMessages()
+  }, [loadInventoryAndPreferences, loadMessages])
+
   useEffect(() => {
-    loadData()
+    loadAll()
 
     const handleInventoryUpdated = () => {
-      loadData()
+      loadInventoryAndPreferences()
+    }
+    const handleMessagesUpdated = () => {
+      loadMessages()
+    }
+    const handlePreferencesUpdated = (event: Event) => {
+      const nextPreferences = (
+        event as CustomEvent<{ preferences?: UserPreferences }>
+      ).detail?.preferences
+
+      if (nextPreferences) {
+        setPreferences(nextPreferences)
+      } else {
+        loadInventoryAndPreferences()
+      }
     }
     window.addEventListener('inventory-updated', handleInventoryUpdated)
+    window.addEventListener('messages-updated', handleMessagesUpdated)
+    window.addEventListener('preferences-updated', handlePreferencesUpdated)
     return () => {
       window.removeEventListener('inventory-updated', handleInventoryUpdated)
+      window.removeEventListener('messages-updated', handleMessagesUpdated)
+      window.removeEventListener('preferences-updated', handlePreferencesUpdated)
     }
-  }, [loadData])
+  }, [loadAll, loadInventoryAndPreferences, loadMessages])
 
   // ドロップダウン・メニューの外側クリックおよびEscapeキーによるクローズ制御
   useEffect(() => {
@@ -201,6 +265,9 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
   const unreadExpirationCount = expiringIngredients.filter(
     (entry) => !viewedNotificationKeys.has(getNotificationKey(entry)),
   ).length
+  const unreadMessages = userMessages.filter((message) => !message.readAt)
+  const unreadNotificationCount =
+    unreadExpirationCount + unreadMessages.length
 
   function markNotificationsViewed(entries: ExpiringIngredientEntry[]) {
     if (entries.length === 0) {
@@ -220,33 +287,21 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
       const nextIsOpen = !current
       if (nextIsOpen) {
         markNotificationsViewed(expiringIngredients)
-        setIsMenuOpen(false) // 通知を開く時はメニューを閉じる
+        if (unreadMessages.length > 0) {
+          void markUserMessagesRead(
+            unreadMessages.map((message) => message.messageId),
+          )
+            .then((result) => {
+              setUserMessages(result.messages)
+              window.dispatchEvent(new Event('messages-updated'))
+            })
+            .catch((error) => {
+              console.warn('[Topbar] Failed to mark messages read:', error)
+            })
+        }
       }
       return nextIsOpen
     })
-  }
-
-  const getDaysText = (days: number) => {
-    if (days < 0) {
-      return t('notification.yesterdayOrBefore')
-    }
-    if (days === 0) {
-      return t('notification.today')
-    }
-    if (days === 1) {
-      return t('notification.tomorrow')
-    }
-    return t('notification.daysRemaining', { days })
-  }
-
-  const getDaysClass = (days: number) => {
-    if (days <= 0) {
-      return 'urgent'
-    }
-    if (days === 1) {
-      return 'warning'
-    }
-    return 'info'
   }
 
   return (
@@ -273,6 +328,7 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
       {/* 💡 クラス名に状態を付与。スマホ時のみポップオーバーメニューに変形 */}
       <nav className={`topbar__nav ${isMenuOpen ? 'is-open' : ''}`} aria-label={t('topbar.menuLabel')}>
         <a
+          className={currentPage === 'fridge' ? 'active' : ''}
           href="#ingredients"
           onClick={(event) => {
             event.preventDefault()
@@ -283,31 +339,27 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
           {t('topbar.ingredients')}
         </a>
         <a
+          className={currentPage === 'recipe-generate' ? 'active' : ''}
           href="#recipes"
           onClick={(event) => {
             event.preventDefault()
-            setIsMenuOpen(false)
-            onNavigate?.('home')
-            setTimeout(() => {
-              document
-                .getElementById('recipes')
-                ?.scrollIntoView({ behavior: 'smooth' })
-            }, 100)
+            onNavigate?.('recipe-generate')
           }}
         >
           {t('topbar.recipes')}
         </a>
         <a
+          className={currentPage === 'ingredient-register' ? 'active' : ''}
           href="#receipt"
           onClick={(event) => {
             event.preventDefault()
-            setIsMenuOpen(false)
-            onNavigate?.('receipt')
+            onNavigate?.('ingredient-register')
           }}
         >
           {t('topbar.receipt')}
         </a>
         <a
+          className={currentPage === 'history' ? 'active' : ''}
           href="#history"
           onClick={(event) => {
             event.preventDefault()
@@ -349,8 +401,8 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
             onClick={toggleNotifications}
           >
             <Icon name="bell" />
-            {unreadExpirationCount > 0 && (
-              <span className="notification-badge">{unreadExpirationCount}</span>
+            {unreadNotificationCount > 0 && (
+              <span className="notification-badge">{unreadNotificationCount}</span>
             )}
           </button>
 
@@ -360,35 +412,64 @@ export function Topbar({ onNavigate, onLogout }: TopbarProps) {
                 <h4>{t('notification.title')}</h4>
               </div>
               <div className="notifications-list">
-                {expiringIngredients.length === 0 ? (
+                {expiringIngredients.length === 0 && userMessages.length === 0 ? (
                   <div className="notifications-empty">
                     {t('notification.none')}
                   </div>
                 ) : (
-                  expiringIngredients.map(({ item, days, date }) => (
-                    <button
-                      key={item.inventoryId ?? item.name}
-                      type="button"
-                      className="notification-item"
-                      onClick={() => {
-                        onNavigate?.('fridge')
-                        setIsOpen(false)
-                      }}
-                    >
-                      <div className="notification-item__icon">
-                        <Icon name="bell" />
-                      </div>
-                      <div className="notification-item__content">
-                        <p className="notification-item__title">{item.name}</p>
-                        <p className="notification-item__desc">
-                          {t('notification.expiring', { name: item.name })}
-                        </p>
-                        <span className={`notification-item__days ${getDaysClass(days)}`}>
-                          {getDaysText(days)} ({date})
-                        </span>
-                      </div>
-                    </button>
-                  ))
+                  <>
+                    {userMessages.map((message) => (
+                      <button
+                        key={message.messageId}
+                        type="button"
+                        className="notification-item"
+                        onClick={() => {
+                          setIsOpen(false)
+                        }}
+                      >
+                        <div className="notification-item__icon notification-item__icon--message">
+                          <Icon name="message" />
+                        </div>
+                        <div className="notification-item__content">
+                          <p className="notification-item__title">
+                            {message.title}
+                          </p>
+                          <p className="notification-item__desc">
+                            {message.body}
+                          </p>
+                          {!message.readAt ? (
+                            <span className="notification-item__days info">
+                              {t('notification.unreadMessage')}
+                            </span>
+                          ) : null}
+                        </div>
+                      </button>
+                    ))}
+                    {expiringIngredients.map(({ item, days, date }) => (
+                      <button
+                        key={item.inventoryId ?? item.name}
+                        type="button"
+                        className="notification-item"
+                        onClick={() => {
+                          onNavigate?.('fridge')
+                          setIsOpen(false)
+                        }}
+                      >
+                        <div className="notification-item__icon">
+                          <Icon name="bell" />
+                        </div>
+                        <div className="notification-item__content">
+                          <p className="notification-item__title">{item.name}</p>
+                          <p className="notification-item__desc">
+                            {t('notification.expiring', { name: item.name })}
+                          </p>
+                          <span className={`notification-item__days ${getDaysClass(days)}`}>
+                            {getDaysText(days, t)} ({date})
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </>
                 )}
               </div>
             </div>

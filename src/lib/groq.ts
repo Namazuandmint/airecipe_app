@@ -1,14 +1,4 @@
-type GroqChatResponse = {
-  ok: boolean
-  message?: string
-  completion?: {
-    choices?: Array<{
-      message?: {
-        content?: string
-      }
-    }>
-  }
-}
+import { ApiError, postJson } from './apiClient'
 
 declare global {
   interface Window {
@@ -25,36 +15,39 @@ export async function testGroqConnection(prompt: string) {
   }
 
   try {
-    const response = await fetch('/api/groq/chat', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: 'user',
-            content: trimmedPrompt,
-          },
-        ],
-        temperature: 0,
-        max_tokens: 7500
-      }),
+    const payload = await postJson<{
+      completion?: {
+        choices?: Array<{
+          message?: {
+            content?: string
+          }
+        }>
+      }
+    }>('/api/groq/chat', {
+      messages: [
+        {
+          role: 'user',
+          content: trimmedPrompt,
+        },
+      ],
+      temperature: 0,
+      max_tokens: 7500,
     })
-
-    const payload = (await response.json()) as GroqChatResponse
-
-    if (!response.ok || !payload.ok) {
-      console.error('[vite] Groq test failed:', payload.message ?? response.statusText)
-      return
-    }
 
     const content = payload.completion?.choices?.[0]?.message?.content
     console.info('[vite] Groq test response:', content ?? payload.completion)
   } catch (error) {
-    console.error('[vite] Groq test request failed:', error)
+    const message =
+      error instanceof ApiError
+        ? error.message
+        : error instanceof Error
+          ? error.message
+          : 'unknown error'
+    console.error('[vite] Groq test failed:', message)
   }
 }
 
-window.testGroq = testGroqConnection
-console.info('[vite] Groq test ready: run window.testGroq("your prompt")')
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  window.testGroq = testGroqConnection
+  console.info('[vite] Groq test ready: run window.testGroq("your prompt")')
+}
