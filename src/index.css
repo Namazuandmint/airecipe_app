@@ -17,6 +17,19 @@
   --line: #dadce0;
   --shadow-soft: none;
   --shadow-subtle: none;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --page-padding-top: 34px;
+  --page-padding-bottom: 56px;
+  --panel-padding: 18px;
+  --section-gap: var(--space-6);
+  --cluster-gap: var(--space-3);
   color: var(--ink);
   background: var(--app-bg);
   font-family:
