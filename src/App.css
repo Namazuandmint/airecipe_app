@@ -2218,17 +2218,30 @@ button:disabled {
     font-size: 15px;
   }
 
-  .hero-actions{
-    display: flex;
-    flex-wrap: nowrap !important; 
-    overflow-x: auto;            
-    gap: 0.5rem;                 
-    padding-bottom: 8px;
+  .hero-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 24px;
+    overflow: visible;
+    padding-bottom: 0;
   }
   
-  .primary-button,
-  .secondary-button {
+  .hero-actions .primary-button,
+  .hero-actions .secondary-button {
     width: 100%;
+    min-width: 0;
+    min-height: 52px;
+    padding: 0 12px;
+    line-height: 1.35;
+    white-space: nowrap;
+  }
+
+  .hero-actions .primary-button span,
+  .hero-actions .secondary-button span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .summary-grid{
@@ -2322,6 +2335,12 @@ button:disabled {
   }
 
   .language-options {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 360px) {
+  .hero-actions {
     grid-template-columns: 1fr;
   }
 }
