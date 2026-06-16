@@ -92,8 +92,8 @@
   display: grid;
   grid-template-columns: minmax(220px, 1fr) auto minmax(220px, 1fr);
   align-items: center;
-  gap: var(--section-gap);
-  padding: var(--space-5) clamp(var(--space-5), 4vw, 56px);
+  gap: 24px;
+  padding: 18px clamp(20px, 4vw, 56px);
   border-bottom: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.94);
   backdrop-filter: blur(18px);
@@ -183,7 +183,106 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--cluster-gap);
+  gap: 10px;
+}
+
+.mobile-menu {
+  position: relative;
+  display: none;
+}
+
+.hamburger-button {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 4px;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #fff;
+  transition:
+    transform 180ms ease,
+    background-color 180ms ease;
+}
+
+.hamburger-button:hover {
+  transform: translateY(-1px);
+  background: var(--surface-soft);
+}
+
+.hamburger-button span {
+  width: 18px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+}
+
+.hamburger-button.is-active span:nth-child(1) {
+  transform: translateY(6px) rotate(45deg);
+}
+
+.hamburger-button.is-active span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-button.is-active span:nth-child(3) {
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+.mobile-menu__panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  width: min(260px, calc(100vw - 32px));
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.mobile-menu__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  border-radius: 6px;
+  color: var(--ink);
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  text-decoration: none;
+}
+
+.mobile-menu__item:hover,
+.mobile-menu__item.is-active {
+  background: var(--surface-soft);
+}
+
+.mobile-menu__item--danger {
+  color: var(--danger);
+}
+
+.mobile-menu__separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--line);
+}
+
+.topbar__desktop-action {
+  display: inline-flex;
 }
 
 button {
@@ -2026,6 +2125,18 @@ button:disabled {
     display: none;
   }
 
+  .mobile-menu {
+    display: block;
+  }
+
+  .hamburger-button {
+    display: inline-flex;
+  }
+
+  .topbar__desktop-action {
+    display: none;
+  }
+
   .hero-panel,
   .dashboard-grid,
   .recipe-detail__grid,
@@ -2063,22 +2174,30 @@ button:disabled {
 
 @media (max-width: 700px) {
   .topbar {
-    gap: var(--space-4);
-    padding: var(--space-4);
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .brand {
+    min-width: 0;
+  }
+
+  .brand strong {
+    font-size: 17px;
+    white-space: nowrap;
   }
 
   .brand small,
-  .account-button span,
   .hide-on-small {
     display: none;
   }
 
-  .account-button {
-    width: 42px;
-    height: 42px;
-    padding: 0;
-    gap: 0;
-    flex: 0 0 42px;
+  .topbar__actions {
+    gap: 8px;
+  }
+
+  .notifications-dropdown {
+    width: min(320px, calc(100vw - 32px));
   }
 
   .home {

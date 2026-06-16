@@ -133,7 +133,7 @@ function getExpiringInfo(ingredient: Ingredient, leadDays: number) {
 export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
   const { language, t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
-  const [isMenuOpen, setIsMenuOpen] = useState(false) // 💡 スマホ用ハンバーガーメニュー開閉状態
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [ingredients, setIngredients] = useState<Ingredient[]>([])
   const [userMessages, setUserMessages] = useState<UserMessage[]>([])
   const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences)
@@ -141,7 +141,7 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
     readViewedNotifications,
   )
   const notificationRef = useRef<HTMLDivElement | null>(null)
-  const menuRef = useRef<HTMLDivElement | null>(null) // 💡 外側クリック検知用
+  const menuRef = useRef<HTMLDivElement | null>(null)
 
   const loadInventoryAndPreferences = useCallback(() => {
     void Promise.all([
@@ -207,7 +207,6 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
     }
   }, [loadAll, loadInventoryAndPreferences, loadMessages])
 
-  // ドロップダウン・メニューの外側クリックおよびEscapeキーによるクローズ制御
   useEffect(() => {
     if (!isOpen && !isMenuOpen) {
       return
@@ -215,14 +214,14 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target
-      if (!(target instanceof Node)) return
+      if (!(target instanceof Node)) {
+        return
+      }
 
-      // 通知ドロップダウンの外側クリック判定
       if (isOpen && !notificationRef.current?.contains(target)) {
         setIsOpen(false)
       }
 
-      // ハンバーガーメニュー自体の外側クリック判定
       if (isMenuOpen && !menuRef.current?.contains(target)) {
         setIsMenuOpen(false)
       }
@@ -269,6 +268,23 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
   const unreadNotificationCount =
     unreadExpirationCount + unreadMessages.length
 
+  const navigationItems: Array<{
+    page: AppDestination
+    href: string
+    label: string
+  }> = [
+    { page: 'fridge', href: '#ingredients', label: t('topbar.ingredients') },
+    { page: 'recipe-generate', href: '#recipes', label: t('topbar.recipes') },
+    { page: 'ingredient-register', href: '#receipt', label: t('topbar.receipt') },
+    { page: 'history', href: '#history', label: t('topbar.history') },
+  ]
+
+  function navigateTo(page: AppDestination) {
+    setIsMenuOpen(false)
+    setIsOpen(false)
+    onNavigate?.(page)
+  }
+
   function markNotificationsViewed(entries: ExpiringIngredientEntry[]) {
     if (entries.length === 0) {
       return
@@ -283,8 +299,10 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
   }
 
   function toggleNotifications() {
+    setIsMenuOpen(false)
     setIsOpen((current) => {
       const nextIsOpen = !current
+
       if (nextIsOpen) {
         markNotificationsViewed(expiringIngredients)
         if (unreadMessages.length > 0) {
@@ -300,6 +318,7 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
             })
         }
       }
+
       return nextIsOpen
     })
   }
@@ -312,8 +331,7 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
         aria-label={t('app.name')}
         onClick={(event) => {
           event.preventDefault()
-          setIsMenuOpen(false)
-          onNavigate?.('home')
+          navigateTo('home')
         }}
       >
         <span className="brand__mark">
@@ -325,68 +343,95 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
         </span>
       </a>
 
-      {/* 💡 クラス名に状態を付与。スマホ時のみポップオーバーメニューに変形 */}
-      <nav className={`topbar__nav ${isMenuOpen ? 'is-open' : ''}`} aria-label={t('topbar.menuLabel')}>
-        <a
-          className={currentPage === 'fridge' ? 'active' : ''}
-          href="#ingredients"
-          onClick={(event) => {
-            event.preventDefault()
-            setIsMenuOpen(false)
-            onNavigate?.('fridge')
-          }}
-        >
-          {t('topbar.ingredients')}
-        </a>
-        <a
-          className={currentPage === 'recipe-generate' ? 'active' : ''}
-          href="#recipes"
-          onClick={(event) => {
-            event.preventDefault()
-            onNavigate?.('recipe-generate')
-          }}
-        >
-          {t('topbar.recipes')}
-        </a>
-        <a
-          className={currentPage === 'ingredient-register' ? 'active' : ''}
-          href="#receipt"
-          onClick={(event) => {
-            event.preventDefault()
-            onNavigate?.('ingredient-register')
-          }}
-        >
-          {t('topbar.receipt')}
-        </a>
-        <a
-          className={currentPage === 'history' ? 'active' : ''}
-          href="#history"
-          onClick={(event) => {
-            event.preventDefault()
-            setIsMenuOpen(false)
-            onNavigate?.('history')
-          }}
-        >
-          {t('topbar.history')}
-        </a>
+      <nav className="topbar__nav" aria-label={t('topbar.menuLabel')}>
+        {navigationItems.map((item) => (
+          <a
+            key={item.page}
+            className={currentPage === item.page ? 'active' : ''}
+            href={item.href}
+            onClick={(event) => {
+              event.preventDefault()
+              navigateTo(item.page)
+            }}
+          >
+            {item.label}
+          </a>
+        ))}
       </nav>
 
-      <div className="topbar__actions" ref={menuRef}>
-        {/* 💡 スマホ用ハンバーガーボタン（PC・タブレット時は非表示） */}
-        <button
-          type="button"
-          className={`hamburger-button ${isMenuOpen ? 'is-active' : ''}`}
-          aria-label="メニューを開閉"
-          aria-expanded={isMenuOpen}
-          onClick={() => {
-            setIsMenuOpen(!isMenuOpen)
-            setIsOpen(false) // メニューを開く時は通知を閉じる
-          }}
-        >
-          <span></span>
-          <span></span>
-          <span></span>
-        </button>
+      <div className="topbar__actions">
+        <div className="mobile-menu" ref={menuRef}>
+          <button
+            type="button"
+            className={`hamburger-button ${isMenuOpen ? 'is-active' : ''}`}
+            aria-label={t('topbar.menuLabel')}
+            aria-controls="mobile-navigation-menu"
+            aria-expanded={isMenuOpen}
+            onClick={() => {
+              setIsOpen(false)
+              setIsMenuOpen((current) => !current)
+            }}
+          >
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
+            <span aria-hidden="true" />
+          </button>
+
+          {isMenuOpen ? (
+            <div
+              id="mobile-navigation-menu"
+              className="mobile-menu__panel"
+              role="menu"
+              aria-label={t('topbar.menuLabel')}
+            >
+              {navigationItems.map((item) => (
+                <a
+                  key={item.page}
+                  className={`mobile-menu__item ${
+                    currentPage === item.page ? 'is-active' : ''
+                  }`}
+                  href={item.href}
+                  role="menuitem"
+                  onClick={(event) => {
+                    event.preventDefault()
+                    navigateTo(item.page)
+                  }}
+                >
+                  <span>{item.label}</span>
+                </a>
+              ))}
+
+              <div className="mobile-menu__separator" role="presentation" />
+
+              <button
+                type="button"
+                className={`mobile-menu__item ${
+                  currentPage === 'settings' ? 'is-active' : ''
+                }`}
+                role="menuitem"
+                onClick={() => navigateTo('settings')}
+              >
+                <Icon name="settings" />
+                <span>{t('topbar.settings')}</span>
+              </button>
+              {onLogout ? (
+                <button
+                  type="button"
+                  className="mobile-menu__item mobile-menu__item--danger"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsMenuOpen(false)
+                    setIsOpen(false)
+                    void onLogout()
+                  }}
+                >
+                  <Icon name="user" />
+                  <span>{t('common.logout')}</span>
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
         <div
           ref={notificationRef}
@@ -451,8 +496,7 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
                         type="button"
                         className="notification-item"
                         onClick={() => {
-                          onNavigate?.('fridge')
-                          setIsOpen(false)
+                          navigateTo('fridge')
                         }}
                       >
                         <div className="notification-item__icon">
@@ -478,11 +522,8 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
 
         <button
           type="button"
-          className="account-button"
-          onClick={() => {
-            setIsMenuOpen(false)
-            onNavigate?.('settings')
-          }}
+          className="account-button topbar__desktop-action"
+          onClick={() => navigateTo('settings')}
         >
           <Icon name="settings" />
           <span>{t('topbar.settings')}</span>
@@ -490,9 +531,10 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
         {onLogout ? (
           <button
             type="button"
-            className="account-button"
+            className="account-button topbar__desktop-action"
             onClick={() => {
               setIsMenuOpen(false)
+              setIsOpen(false)
               void onLogout()
             }}
           >
