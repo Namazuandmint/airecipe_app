@@ -180,7 +180,15 @@ export function Topbar({ currentPage, onNavigate, onLogout }: TopbarProps) {
   useEffect(() => {
     loadAll()
 
-    const handleInventoryUpdated = () => {
+    const handleInventoryUpdated = (event: Event) => {
+      const nextInventory = (event as CustomEvent<{ inventory?: Ingredient[] }>)
+        .detail?.inventory
+
+      if (nextInventory) {
+        setIngredients(nextInventory)
+        return
+      }
+
       loadInventoryAndPreferences()
     }
     const handleMessagesUpdated = () => {

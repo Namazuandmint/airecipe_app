@@ -30,9 +30,13 @@ export type InventoryMutationInput = {
   memo?: string | null
 }
 
-function dispatchInventoryUpdated() {
+function dispatchInventoryUpdated(inventory?: Ingredient[]) {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('inventory-updated'))
+    window.dispatchEvent(
+      new CustomEvent('inventory-updated', {
+        detail: { inventory },
+      }),
+    )
   }
 }
 
@@ -41,7 +45,7 @@ export async function createInventoryItem(item: InventoryMutationInput) {
     userId: string
     inventory: Ingredient[]
   }>('/api/inventory', item)
-  dispatchInventoryUpdated()
+  dispatchInventoryUpdated(result.inventory)
   return result
 }
 
@@ -50,7 +54,7 @@ export async function updateInventoryItem(item: InventoryMutationInput) {
     userId: string
     inventory: Ingredient[]
   }>('/api/inventory', item)
-  dispatchInventoryUpdated()
+  dispatchInventoryUpdated(result.inventory)
   return result
 }
 
@@ -59,7 +63,7 @@ export async function deleteInventoryItem(inventoryId: number) {
     userId: string
     inventory: Ingredient[]
   }>(`/api/inventory/${encodeURIComponent(String(inventoryId))}`)
-  dispatchInventoryUpdated()
+  dispatchInventoryUpdated(result.inventory)
   return result
 }
 
@@ -82,7 +86,6 @@ export async function generateRecipes(
     cookingRequest,
     seasoningMode,
   })
-  dispatchInventoryUpdated()
   return result
 }
 
@@ -101,7 +104,7 @@ export async function markRecipeCooked(
     servings,
     language,
   })
-  dispatchInventoryUpdated()
+  dispatchInventoryUpdated(result.inventory)
   return result
 }
 
@@ -132,7 +135,6 @@ export async function deleteSavedRecipe(
       language,
     ),
   )
-  dispatchInventoryUpdated()
   return result
 }
 
@@ -148,7 +150,5 @@ export async function setRecipeFavorite(
     recipeId,
     isFavorite,
   })
-  dispatchInventoryUpdated()
   return result
 }
-

@@ -14,7 +14,7 @@ import {
   generateRecipes,
   markRecipeCooked,
 } from '../lib/recipeApi'
-import { formatRecipeModelSource } from '../lib/recipeModelLabel'
+import { getRecipeModelDisplayName } from '../lib/recipeModelLabel'
 import {
   defaultPreferences,
   fetchPreferences,
@@ -333,14 +333,11 @@ export function HomePage({
 
       if (result.recipes.length) {
         setRecipes(result.recipes)
-        const modelSource = formatRecipeModelSource(
-          result.modelProvider,
-          result.modelName,
+        showToast(
+          t('recipeGenerate.generatedByModel', {
+            model: getRecipeModelDisplayName(result.modelProvider),
+          }),
         )
-        setStatusMessage(t('home.status.generateSuccess'))
-        if (modelSource) {
-          showToast(modelSource)
-        }
       }
       setIsGenerating(false)
     } catch (error) {

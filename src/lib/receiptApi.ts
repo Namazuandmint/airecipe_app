@@ -10,9 +10,13 @@ export async function parseReceiptText(
   }>('/api/receipts/parse', { ocrText, registrationDate })
 }
 
-function dispatchInventoryUpdated() {
+function dispatchInventoryUpdated(inventory?: Ingredient[]) {
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('inventory-updated'))
+    window.dispatchEvent(
+      new CustomEvent('inventory-updated', {
+        detail: { inventory },
+      }),
+    )
   }
 }
 
@@ -24,7 +28,7 @@ export async function importReceiptItems(
     importedCount: number
     inventory: Ingredient[]
   }>('/api/receipts/import', { items })
-  dispatchInventoryUpdated()
+  dispatchInventoryUpdated(result.inventory)
   return result
 }
 
@@ -34,7 +38,8 @@ export async function importReceiptItemsDetail(
   const result = await postJson<{
     userId: string
     importedCount: number
+    inventory: Ingredient[]
   }>('/api/receipts/import-detail', { items })
-  dispatchInventoryUpdated()
+  dispatchInventoryUpdated(result.inventory)
   return result
 }

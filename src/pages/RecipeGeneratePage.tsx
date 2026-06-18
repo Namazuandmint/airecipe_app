@@ -7,7 +7,7 @@ import {
   fetchSavedRecipes,
   generateRecipes,
 } from '../lib/recipeApi'
-import { formatRecipeModelSource } from '../lib/recipeModelLabel'
+import { getRecipeModelDisplayName } from '../lib/recipeModelLabel'
 import { defaultPreferences, fetchPreferences } from '../lib/preferencesApi'
 import { useI18n } from '../lib/useI18n'
 import type {
@@ -187,14 +187,11 @@ export function RecipeGeneratePage({
       )
 
       setRecipes(result.recipes)
-      const modelSource = formatRecipeModelSource(
-        result.modelProvider,
-        result.modelName,
+      showToast(
+        t('recipeGenerate.generatedByModel', {
+          model: getRecipeModelDisplayName(result.modelProvider),
+        }),
       )
-      setStatusMessage(t('recipeGenerate.generateSuccess'))
-      if (modelSource) {
-        showToast(modelSource)
-      }
       setIsGenerating(false)
     } catch (error) {
       setStatusMessage(
