@@ -53,6 +53,7 @@ const loadAdminConsolePage = () => import('./pages/AdminConsolePage')
 const loadRecipeGeneratePage = () => import('./pages/RecipeGeneratePage')
 const loadLoginScreen = () => import('./pages/LoginScreen')
 const loadRegisterPage = () => import('./pages/RegisterPage')
+const loadShoppingListPage = () => import('./pages/ShoppingListPage')
 
 const HomePage = lazy(() =>
   loadHomePage().then((m) => ({ default: m.HomePage })),
@@ -106,6 +107,9 @@ const RecipeGeneratePage = lazy(() =>
 )
 const LoginScreen = lazy(loadLoginScreen)
 const RegisterPage = lazy(loadRegisterPage)
+const ShoppingListPage = lazy(() =>
+  loadShoppingListPage().then((m) => ({ default: m.ShoppingListPage })),
+)
 
 const PAGE_FALLBACK = (
   <div className="page-loading" aria-label="Loading page..." />
@@ -165,6 +169,7 @@ function preloadAuthenticatedRouteModules() {
     loadContactPage,
     loadReceiptScanPage,
     loadRecipeDetailPage,
+    loadShoppingListPage,
   ]
 
   primaryLoaders.forEach((loader) => {
@@ -182,6 +187,8 @@ function getPageFromPath(): AppDestination {
   switch (window.location.pathname) {
     case '/fridge':
       return 'fridge'
+    case '/shopping-list':
+      return 'shopping-list'
     case '/history':
       return 'history'
     case '/receipt':
@@ -563,6 +570,9 @@ function App() {
   switch (currentPage) {
     case 'fridge':
       pageNode = <FridgePage onNavigate={handleNavigate} onLogout={handleLogout} />
+      break
+    case 'shopping-list':
+      pageNode = <ShoppingListPage onNavigate={handleNavigate} onLogout={handleLogout} />
       break
     case 'history':
       pageNode = (
