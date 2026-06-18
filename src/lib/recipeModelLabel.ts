@@ -1,5 +1,17 @@
 export type RecipeModelProvider = 'gemini' | 'groq'
 
+export function getRecipeModelDisplayName(provider?: RecipeModelProvider) {
+  if (provider === 'gemini') {
+    return 'Gemini'
+  }
+
+  if (provider === 'groq') {
+    return 'GPT'
+  }
+
+  return 'AI'
+}
+
 export function formatRecipeModelSource(
   provider?: RecipeModelProvider,
   modelName?: string,
@@ -8,8 +20,7 @@ export function formatRecipeModelSource(
     return ''
   }
 
-  const providerLabel =
-    provider === 'gemini' ? 'Gemini' : provider === 'groq' ? 'Groq' : 'AI'
+  const providerLabel = getRecipeModelDisplayName(provider)
 
   return modelName ? `${providerLabel}: ${modelName}` : providerLabel
 }

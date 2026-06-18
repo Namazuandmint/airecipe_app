@@ -942,13 +942,24 @@ async function reduceInventoryAmount({
 
   const results = await Promise.all(
     updates.map(async ({ row, deduction, nextAmount }) => {
-      const { error: updateError } = await client
-        .from('inventory')
-        .update({ [column]: nextAmount })
-        .eq('inventory_id', row.inventory_id)
+      const nextQuantity =
+        column === 'quantity' ? nextAmount : Number(row.quantity ?? 0)
+      const nextGram = column === 'gram' ? nextAmount : Number(row.gram ?? 0)
+      const shouldDeleteRow = nextQuantity <= 0 && nextGram <= 0
+
+      const mutation = shouldDeleteRow
+        ? client.from('inventory').delete().eq('inventory_id', row.inventory_id)
+        : client
+            .from('inventory')
+            .update({ [column]: nextAmount })
+            .eq('inventory_id', row.inventory_id)
+
+      const { error: updateError } = await mutation
 
       if (updateError) {
-        throw new Error(`Failed to update inventory: ${updateError.message}`)
+        throw new Error(
+          `Failed to ${shouldDeleteRow ? 'delete' : 'update'} inventory: ${updateError.message}`,
+        )
       }
 
       return {
@@ -957,6 +968,7 @@ async function reduceInventoryAmount({
         column,
         used: deduction,
         remaining: nextAmount,
+        deleted: shouldDeleteRow,
       }
     }),
   )

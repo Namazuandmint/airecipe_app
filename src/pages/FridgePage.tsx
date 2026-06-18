@@ -1,4 +1,11 @@
-import { useDeferredValue, useEffect, useMemo, useState, type FormEvent } from 'react'
+import {
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react'
 import { Icon } from '../components/Icon'
 import { useI18n } from '../lib/useI18n'
 import { getCache, setCache } from '../lib/dataCache'
@@ -303,6 +310,8 @@ export function FridgePage({
   const [deleteConfirm, setDeleteConfirm] = useState<DeleteConfirmState>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState('')
+  const [toastMessage, setToastMessage] = useState('')
+  const toastTimerRef = useRef<number | null>(null)
   const summary = useMemo(() => buildSummary(ingredients), [ingredients])
   const aggregatedIngredients = useMemo(
     () => aggregateIngredients(ingredients, language),
@@ -447,6 +456,27 @@ export function FridgePage({
     searchQuery.trim() !== '' ||
     sortMode !== 'nameAsc' ||
     expirationFilter !== 'all'
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current)
+        toastTimerRef.current = null
+      }
+    }
+  }, [])
+
+  function showToast(message: string) {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current)
+    }
+
+    setToastMessage(message)
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage('')
+      toastTimerRef.current = null
+    }, 2400)
+  }
 
   function getCategoryLabel(category: string) {
     switch (category) {
@@ -609,7 +639,7 @@ export function FridgePage({
             ) ?? null
           : null,
       )
-      setStatusMessage(
+      showToast(
         input.inventoryId ? t('fridge.status.updated') : t('fridge.status.added'),
       )
       setIsFormOpen(false)
@@ -664,7 +694,7 @@ export function FridgePage({
     const uniqueIds = Array.from(new Set(ids))
 
     if (!uniqueIds.length) {
-      setStatusMessage(t('fridge.selection.deleteNone'))
+      showToast(t('fridge.selection.deleteNone'))
       return
     }
 
@@ -691,7 +721,7 @@ export function FridgePage({
       )
       setSelectedInventoryIds(new Set())
       setIsSelectionMode(false)
-      setStatusMessage(
+      showToast(
         t('fridge.selection.deletedCount', { count: uniqueIds.length }),
       )
       setIsSaving(false)
@@ -718,7 +748,7 @@ export function FridgePage({
 
   function handleDeleteExpired() {
     if (!expiredInventoryIds.length) {
-      setStatusMessage(t('fridge.selection.deleteNone'))
+      showToast(t('fridge.selection.deleteNone'))
       return
     }
 
@@ -1488,6 +1518,11 @@ export function FridgePage({
               </button>
             </div>
           </form>
+        </div>
+      ) : null}
+      {toastMessage ? (
+        <div className="toast-message" role="status">
+          {toastMessage}
         </div>
       ) : null}
     </>
