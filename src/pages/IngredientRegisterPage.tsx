@@ -405,9 +405,8 @@ export function IngredientRegisterPage({
               role="tab"
               aria-selected={method === 'receipt'}
               aria-controls="panel-receipt"
-              className={`register-method-label ${
-                method === 'receipt' ? 'is-active' : ''
-              }`}
+              className={`register-method-label ${method === 'receipt' ? 'is-active' : ''
+                }`}
               onClick={() => selectMethod('receipt')}
             >
               <img className="register-method-label__icon" src="/receipt.png" alt="" aria-hidden="true" />
@@ -421,9 +420,8 @@ export function IngredientRegisterPage({
               role="tab"
               aria-selected={method === 'image'}
               aria-controls="panel-image"
-              className={`register-method-label ${
-                method === 'image' ? 'is-active' : ''
-              }`}
+              className={`register-method-label ${method === 'image' ? 'is-active' : ''
+                }`}
               onClick={() => selectMethod('image')}
             >
               <img className="register-method-label__icon" src="/camera.png" alt="" aria-hidden="true" />

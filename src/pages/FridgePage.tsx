@@ -13,7 +13,7 @@ import type { AppDestination, Ingredient } from '../types/ui'
 
 type Summary = {
   totalCount: number
-  uniqueNamesCount: number
+  categoriesCount: number
   nearExpirationCount: number
   expiredCount: number
 }
@@ -233,8 +233,8 @@ function aggregateIngredients(
 function buildSummary(ingredients: Ingredient[]): Summary {
   return {
     totalCount: ingredients.length,
-    uniqueNamesCount: new Set(
-      ingredients.map((item) => item.name.trim().toLocaleLowerCase()),
+    categoriesCount: new Set(
+      ingredients.map((item) => item.category?.trim() || 'その他'),
     ).size,
     nearExpirationCount: ingredients.filter((item) =>
       isNearExpiration(item.expirationDate) || isNearExpiration(item.bestBeforeDate),
@@ -420,6 +420,7 @@ export function FridgePage({
         new Set([
           '肉・卵・魚',
           '野菜',
+          '果物',
           '乳製品',
           '加工品',
           'その他',
@@ -454,6 +455,8 @@ export function FridgePage({
         return t('category.meatEggFish')
       case '野菜':
         return t('category.vegetable')
+      case '果物':
+        return t('category.fruit')
       case '乳製品':
         return t('category.dairy')
       case '加工品':
@@ -845,9 +848,9 @@ export function FridgePage({
                 <span className="card-note">{t('fridge.summary.totalNote')}</span>
               </div>
               <div className="summary-card">
-                <span className="card-label">{t('fridge.summary.unique')}</span>
-                <strong className="card-value">{summary.uniqueNamesCount}</strong>
-                <span className="card-note">{t('fridge.summary.uniqueNote')}</span>
+                <span className="card-label">{t('fridge.summary.categories')}</span>
+                <strong className="card-value">{summary.categoriesCount}</strong>
+                <span className="card-note">{t('fridge.summary.categoriesNote')}</span>
               </div>
               <div
                 className={`summary-card ${summary.nearExpirationCount > 0 ? 'clickable' : ''}`}

@@ -325,10 +325,10 @@ export async function parseReceiptText({ ocrText, registrationDate }) {
     const items = normalizeReceiptItems(payload.items).filter((item) =>
       productLines.length
         ? productLines.some((line) =>
-            line.includes(item.name) ||
-            normalizeIngredientName(line).includes(item.name) ||
-            item.name.includes(normalizeIngredientName(line)),
-          ) || item.category !== 'その他'
+          line.includes(item.name) ||
+          normalizeIngredientName(line).includes(item.name) ||
+          item.name.includes(normalizeIngredientName(line)),
+        ) || item.category !== 'その他'
         : true,
     )
 

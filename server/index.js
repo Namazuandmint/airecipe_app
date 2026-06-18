@@ -785,8 +785,8 @@ async function handleUserFridge(userId, response) {
       expiration_date: item.expirationDate ?? null,
     }))
     const totalCount = ingredients.length
-    const uniqueNamesCount = new Set(
-      ingredients.map((item) => item.ingredient_name),
+    const categoriesCount = new Set(
+      ingredients.map((item) => item.category ?? 'その他'),
     ).size
     const openedCount = ingredients.filter((item) => item.is_opened).length
     const now = new Date()
@@ -814,7 +814,7 @@ async function handleUserFridge(userId, response) {
       userId,
       summary: {
         totalCount,
-        uniqueNamesCount,
+        categoriesCount,
         openedCount,
         nearExpirationCount,
       },
