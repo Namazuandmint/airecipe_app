@@ -7,6 +7,7 @@ import {
   useState,
   type MutableRefObject,
 } from 'react'
+import { flushSync } from 'react-dom'
 import './App.css'
 
 if (import.meta.env.DEV) {
@@ -137,12 +138,12 @@ function scheduleAfterInitialPaint(callback: () => void) {
 
   const startHandle = window.setTimeout(() => {
     if (idleWindow.requestIdleCallback) {
-      idleHandle = idleWindow.requestIdleCallback(callback, { timeout: 4000 })
+      idleHandle = idleWindow.requestIdleCallback(callback, { timeout: 1000 })
       return
     }
 
-    fallbackHandle = window.setTimeout(callback, 900)
-  }, 700)
+    fallbackHandle = window.setTimeout(callback, 160)
+  }, 120)
 
   return () => {
     window.clearTimeout(startHandle)
@@ -165,29 +166,22 @@ function queueRouteModulePreloads(loaders: Array<() => Promise<unknown>>) {
 
   const idleWindow = window as WindowWithIdleCallback
 
-  function run(index: number) {
-    const loader = loaders[index]
-
-    if (!loader) {
-      return
-    }
-
+  loaders.forEach((loader, index) => {
     const load = () => {
       void loader().catch((error) => {
         console.warn('[vite] Route preload failed:', error)
       })
-      window.setTimeout(() => run(index + 1), 160)
     }
 
-    if (idleWindow.requestIdleCallback) {
-      idleWindow.requestIdleCallback(load, { timeout: 1400 })
-      return
-    }
+    window.setTimeout(() => {
+      if (idleWindow.requestIdleCallback) {
+        idleWindow.requestIdleCallback(load, { timeout: 900 + index * 80 })
+        return
+      }
 
-    window.setTimeout(load, index === 0 ? 0 : 160)
-  }
-
-  run(0)
+      load()
+    }, index * 90)
+  })
 }
 
 function preloadAuthenticatedRouteModules(
@@ -360,18 +354,24 @@ function App() {
     useState<AuthTokenPair | null>(null)
   const oauthSessionRequestRef = useRef<OAuthSessionRequest | null>(null)
   const hasPreloaded = useRef(false)
+  const currentPageRef = useRef(currentPage)
+
+  useEffect(() => {
+    currentPageRef.current = currentPage
+  }, [currentPage])
 
   useEffect(() => {
     if (currentUser && !hasPreloaded.current) {
-      hasPreloaded.current = true
       return scheduleAfterInitialPaint(() => {
-        preloadAuthenticatedRouteModules(currentPage, Boolean(currentUser.isAdmin))
-        void preloadAllPageData({ currentPage, userId: currentUser.id })
+        hasPreloaded.current = true
+        const preloadPage = currentPageRef.current
+        preloadAuthenticatedRouteModules(preloadPage, Boolean(currentUser.isAdmin))
+        void preloadAllPageData({ currentPage: preloadPage, userId: currentUser.id })
       })
     }
 
     return undefined
-  }, [currentPage, currentUser])
+  }, [currentUser])
 
   useEffect(() => {
     let isMounted = true
@@ -510,17 +510,25 @@ function App() {
     setCurrentPage('home')
   }, [])
 
+  const completeClientLogout = useCallback(() => {
+    clearCache()
+    replacePath('/login')
+    setCurrentUser(null)
+    setSelectedRecipe(null)
+    setSelectedReceiptItems([])
+    setPasswordResetTokens(null)
+    setHistoryInitialFilter('all')
+    hasPreloaded.current = false
+    setCurrentPage('login')
+  }, [])
+
   const handleLogout = useCallback(async () => {
+    flushSync(completeClientLogout)
+
     await logout().catch((error) => {
       console.warn('[vite] Logout failed:', error)
     })
-    setCurrentUser(null)
-    setSelectedRecipe(null)
-    setPasswordResetTokens(null)
-    clearCache()
-    replacePath('/login')
-    setCurrentPage('login')
-  }, [])
+  }, [completeClientLogout])
 
   const handleSelectRecipe = useCallback(
     (recipe: Recipe) => {

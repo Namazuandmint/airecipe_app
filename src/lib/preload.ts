@@ -51,23 +51,27 @@ const preloadPriorityByPage: Record<string, PreloadTaskKey[]> = {
   admin: ['preferences', 'inventory', 'recipes'],
 }
 
-function waitForBackgroundSlot(index: number) {
+function scheduleBackgroundTask(index: number, task: () => Promise<void>) {
   if (typeof window === 'undefined') {
-    return Promise.resolve()
+    return task()
   }
 
-  const delay = index === 0 ? 80 : 180
+  const delay = index === 0 ? 0 : 120 + index * 80
 
   return new Promise<void>((resolve) => {
+    const run = () => {
+      void task().finally(resolve)
+    }
+
     window.setTimeout(() => {
       const idleWindow = window as WindowWithIdleCallback
 
       if (idleWindow.requestIdleCallback) {
-        idleWindow.requestIdleCallback(resolve, { timeout: 1200 })
+        idleWindow.requestIdleCallback(run, { timeout: 800 + index * 120 })
         return
       }
 
-      resolve()
+      run()
     }, delay)
   })
 }
@@ -161,15 +165,17 @@ export async function preloadAllPageData(
 
   const taskKeys = getOrderedTaskKeys(options.currentPage)
 
-  for (const [index, taskKey] of taskKeys.entries()) {
-    await waitForBackgroundSlot(index)
-
-    try {
-      await tasks[taskKey]()
-    } catch (error) {
-      console.warn(`[vite] ${taskKey} preload failed:`, error)
-    }
-  }
+  await Promise.allSettled(
+    taskKeys.map((taskKey, index) =>
+      scheduleBackgroundTask(index, async () => {
+        try {
+          await tasks[taskKey]()
+        } catch (error) {
+          console.warn(`[vite] ${taskKey} preload failed:`, error)
+        }
+      }),
+    ),
+  )
 
   syncCompositeCaches()
 }
