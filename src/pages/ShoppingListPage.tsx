@@ -267,18 +267,6 @@ export function ShoppingListPage({
     })
   }
 
-  function toggleItemChecked(id: string) {
-    setCheckedItemIds((current) => {
-      const next = new Set(current)
-      if (next.has(id)) {
-        next.delete(id)
-      } else {
-        next.add(id)
-      }
-      return next
-    })
-  }
-
   async function handleMoveToFridge() {
     const itemsToMove = shoppingItems.filter((item) => item.checked)
     if (itemsToMove.length === 0) return
@@ -625,7 +613,6 @@ export function ShoppingListPage({
                   <table className="fridge-table">
                     <thead>
                       <tr>
-                        <th style={{ width: '48px', textAlign: 'center' }}></th>
                         <th>{t('fridge.table.ingredient')}</th>
                         <th>{t('fridge.form.quantity')}</th>
                         <th>{t('fridge.form.gram')}</th>
@@ -635,13 +622,6 @@ export function ShoppingListPage({
                     <tbody>
                       {items.map((item) => (
                         <tr key={item.id} className={item.checked ? 'near-expiration-row' : ''}>
-                          <td style={{ textAlign: 'center', verticalAlign: 'middle', padding: '16px 20px' }}>
-                            <input
-                              type="checkbox"
-                              checked={item.checked}
-                              onChange={() => toggleItemChecked(item.id)}
-                            />
-                          </td>
                           <td className="ingredient-name-cell" style={{ verticalAlign: 'middle' }}>
                             <span className="ingredient-name" style={{ fontWeight: '800' }}>{item.name}</span>
                             {item.isManual && (
