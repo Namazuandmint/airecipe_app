@@ -1292,10 +1292,12 @@ async function handleReceiptImportDetail(request, response, userId) {
       items: body?.items,
       userId,
     })
+    const inventory = await getInventoryForUser(result.userId)
 
     sendJson(response, 200, {
       ok: true,
       ...result,
+      inventory: inventory.inventory,
     })
   } catch (error) {
     sendJson(response, 500, {
