@@ -121,6 +121,23 @@ export function RecipeGeneratePage({
   const [toastMessage, setToastMessage] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const toastTimerRef = useRef<number | null>(null)
+  const [prevLoadLanguage, setPrevLoadLanguage] = useState<string | null>(null)
+
+  if (prevLoadLanguage !== language) {
+    setPrevLoadLanguage(language)
+    const cachedGenerate = getCache<{
+      ingredients: Ingredient[]
+      recipes: Recipe[]
+      preferences: UserPreferences
+    }>(`recipe-generate:${language}`)
+    if (cachedGenerate) {
+      setIngredients(cachedGenerate.ingredients)
+      setRecipes(cachedGenerate.recipes)
+      setPreferences(cachedGenerate.preferences)
+      setServings(cachedGenerate.preferences.defaultServings)
+      setIsLoading(false)
+    }
+  }
 
   const visibleIngredients = useMemo(
     () => ingredients.slice(0, 12),

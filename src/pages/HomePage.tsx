@@ -181,6 +181,32 @@ export function HomePage({
   const [cookingRecipe, setCookingRecipe] = useState<Recipe | null>(null)
   const [servings, setServings] = useState(1)
   const toastTimerRef = useRef<number | null>(null)
+  const [prevLoadLanguage, setPrevLoadLanguage] = useState<string | null>(null)
+
+  if (prevLoadLanguage !== language) {
+    setPrevLoadLanguage(language)
+    const cachedHome = getCache<HomeData>(`home:${language}`)
+    if (cachedHome) {
+      setIngredients(cachedHome.ingredients)
+      setRecipes(cachedHome.recipes)
+      setPreferences(cachedHome.preferences)
+      setLoadingState({
+        ingredients: false,
+        recipes: false,
+        preferences: false,
+      })
+    } else {
+      setIngredients([])
+      setRecipes([])
+      setPreferences(defaultPreferences)
+      setLoadingState({
+        ingredients: true,
+        recipes: true,
+        preferences: true,
+      })
+    }
+  }
+
   const secondaryFeatures = useMemo(() => getSecondaryFeatures(t), [t])
   const currentSummaryItems = useMemo(
     () => buildSummaryItems(ingredients, recipes, preferences, t, loadingState),

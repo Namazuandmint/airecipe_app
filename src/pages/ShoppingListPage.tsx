@@ -404,15 +404,18 @@ export function ShoppingListPage({
     const gram = manualForm.gram
       ? Math.max(1, Math.round(Number(manualForm.gram) || 1))
       : null
+    const category = manualForm.category.trim() || inferCategory(name)
+    const memo = manualForm.memo.trim() || undefined
+
     const item: Omit<ShoppingItem, 'checked'> = {
       // eslint-disable-next-line react-hooks/purity
       id: `manual-${Date.now()}`,
       name,
-      category: manualForm.category.trim() || inferCategory(name),
+      category,
       quantity,
       gram,
       isManual: true,
-      memo: manualForm.memo.trim() || undefined,
+      memo,
     }
 
     setManualItems((current) => [item, ...current])
