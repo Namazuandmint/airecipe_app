@@ -405,6 +405,7 @@ export function ShoppingListPage({
       ? Math.max(1, Math.round(Number(manualForm.gram) || 1))
       : null
     const item: Omit<ShoppingItem, 'checked'> = {
+      // eslint-disable-next-line react-hooks/purity
       id: `manual-${Date.now()}`,
       name,
       category: manualForm.category.trim() || inferCategory(name),

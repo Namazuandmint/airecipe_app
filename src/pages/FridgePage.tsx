@@ -285,9 +285,31 @@ export function FridgePage({
   onLogout?: () => void | Promise<void>
 }) {
   const { language, t } = useI18n()
-  const [ingredients, setIngredients] = useState<Ingredient[]>([])
-  const [loading, setLoading] = useState(true)
+  const [ingredients, setIngredients] = useState<Ingredient[]>(() => {
+    const cacheKey = `inventory:${language}`
+    return getCache<Ingredient[]>(cacheKey) || []
+  })
+  const [loading, setLoading] = useState(() => {
+    const cacheKey = `inventory:${language}`
+    return !getCache<Ingredient[]>(cacheKey)
+  })
   const [error, setError] = useState<string | null>(null)
+
+  const [prevLanguage, setPrevLanguage] = useState(language)
+  if (language !== prevLanguage) {
+    setPrevLanguage(language)
+    const cacheKey = `inventory:${language}`
+    const cached = getCache<Ingredient[]>(cacheKey)
+    if (cached) {
+      setIngredients(cached)
+      setError(null)
+      setLoading(false)
+    } else {
+      setIngredients([])
+      setError(null)
+      setLoading(true)
+    }
+  }
   const [statusMessage, setStatusMessage] = useState('')
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false)
@@ -557,13 +579,6 @@ export function FridgePage({
     let isMounted = true
     const cacheKey = `inventory:${language}`
 
-    const cached = getCache<Ingredient[]>(cacheKey)
-    if (cached) {
-      setIngredients(cached)
-      setError(null)
-      setLoading(false)
-    }
-
     fetchInventory(language)
       .then((result) => {
         if (isMounted) {
@@ -587,7 +602,7 @@ export function FridgePage({
     return () => {
       isMounted = false
     }
-  }, [language])
+  }, [language, t])
 
   function openEditForm(ingredient: Ingredient) {
     setFormState(buildFormFromIngredient(ingredient))
@@ -1103,22 +1118,22 @@ export function FridgePage({
           ) : (
             sortedCategoryEntries
               .map(([category, items]) => (
-                <div key={category} className="category-table-wrapper">
+                <div key={category} className="category-table-wrapper" data-category={category}>
                   <h2 className="category-title">{getCategoryLabel(category)}</h2>
                   <div className="table-container">
                     <table className={`fridge-table ${isSelectionMode ? 'is-selecting' : ''}`}>
                       <thead>
                         <tr>
                           {isSelectionMode ? (
-                            <th aria-label={t('fridge.selection.select')}></th>
+                            <th aria-label={t('fridge.selection.select')} className="col-select"></th>
                           ) : null}
-                          <th>{t('fridge.table.ingredient')}</th>
-                          <th>{t('fridge.form.quantity')}</th>
-                          <th>{t('fridge.form.gram')}</th>
-                          <th>{t('fridge.table.bestBefore')}</th>
-                          <th>{t('fridge.table.expiration')}</th>
-                          <th>{t('fridge.table.memo')}</th>
-                          <th>{t('fridge.table.actions')}</th>
+                          <th className="col-ingredient">{t('fridge.table.ingredient')}</th>
+                          <th className="col-quantity">{t('fridge.form.quantity')}</th>
+                          <th className="col-weight">{t('fridge.form.gram')}</th>
+                          <th className="col-best-before">{t('fridge.table.bestBefore')}</th>
+                          <th className="col-expiration">{t('fridge.table.expiration')}</th>
+                          <th className="col-memo">{t('fridge.table.memo')}</th>
+                          <th className="col-actions">{t('fridge.table.actions')}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1158,7 +1173,7 @@ export function FridgePage({
                               }
                             >
                               {isSelectionMode ? (
-                                <td>
+                                <td className="col-select">
                                   <input
                                     type="checkbox"
                                     aria-label={t(
@@ -1176,7 +1191,7 @@ export function FridgePage({
                                   />
                                 </td>
                               ) : null}
-                              <td className="ingredient-name-cell">
+                              <td className="col-ingredient ingredient-name-cell">
                                 <button
                                   type="button"
                                   className="ingredient-name-link"
@@ -1188,17 +1203,17 @@ export function FridgePage({
                                   {item.name}
                                 </button>
                               </td>
-                              <td>
+                              <td className="col-quantity">
                                 <span className="amount-text">
                                   {formatQuantity(item.quantity, language)}
                                 </span>
                               </td>
-                              <td>
+                              <td className="col-weight">
                                 <span className="amount-text">
                                   {formatGram(item.gram)}
                                 </span>
                               </td>
-                              <td>
+                              <td className="col-best-before">
                                 <span className={
                                   isExpired(item.nearestBestBeforeDate)
                                     ? 'expiration-expired'
@@ -1209,7 +1224,7 @@ export function FridgePage({
                                   {formatDate(item.nearestBestBeforeDate, language)}
                                 </span>
                               </td>
-                              <td>
+                              <td className="col-expiration">
                                 <span className={
                                   isExpired(item.nearestExpirationDate)
                                     ? 'expiration-expired'
@@ -1220,12 +1235,12 @@ export function FridgePage({
                                   {formatDate(item.nearestExpirationDate, language)}
                                 </span>
                               </td>
-                              <td>
+                              <td className="col-memo">
                                 {item.isGrouped
                                   ? t('fridge.detail.aggregateMemo')
                                   : item.memo}
                               </td>
-                              <td>
+                              <td className="col-actions">
                                 <div className="fridge-row-actions">
                                   <button
                                     type="button"
@@ -1285,16 +1300,97 @@ export function FridgePage({
                 <strong>{t('fridge.form.gram')}</strong>
                 {formatGram(detailIngredient.gram)}
               </span>
-              <span>
-                <strong>{t('fridge.table.expiration')}</strong>
-                {formatDate(detailIngredient.nearestExpirationDate, language)}
-              </span>
+              {detailIngredient.nearestBestBeforeDate ? (
+                <span
+                  onClick={() => {
+                    const idx = detailIngredient.items.findIndex(
+                      (item) => item.bestBeforeDate === detailIngredient.nearestBestBeforeDate,
+                    )
+                    if (idx !== -1) {
+                      const el = document.getElementById(`detail-item-${idx}`)
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        el.classList.add('flash-highlight-warning')
+                        setTimeout(() => el.classList.remove('flash-highlight-warning'), 2000)
+                      }
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      const idx = detailIngredient.items.findIndex(
+                        (item) => item.bestBeforeDate === detailIngredient.nearestBestBeforeDate,
+                      )
+                      if (idx !== -1) {
+                        const el = document.getElementById(`detail-item-${idx}`)
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                          el.classList.add('flash-highlight-warning')
+                          setTimeout(() => el.classList.remove('flash-highlight-warning'), 2000)
+                        }
+                      }
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <strong>{t('fridge.table.bestBefore')}</strong>
+                  {formatDate(detailIngredient.nearestBestBeforeDate, language)}
+                </span>
+              ) : null}
+              {detailIngredient.nearestExpirationDate ? (
+                <span
+                  onClick={() => {
+                    const idx = detailIngredient.items.findIndex(
+                      (item) => item.expirationDate === detailIngredient.nearestExpirationDate,
+                    )
+                    if (idx !== -1) {
+                      const el = document.getElementById(`detail-item-${idx}`)
+                      if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        el.classList.add('flash-highlight-danger')
+                        setTimeout(() => el.classList.remove('flash-highlight-danger'), 2000)
+                      }
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault()
+                      const idx = detailIngredient.items.findIndex(
+                        (item) => item.expirationDate === detailIngredient.nearestExpirationDate,
+                      )
+                      if (idx !== -1) {
+                        const el = document.getElementById(`detail-item-${idx}`)
+                        if (el) {
+                          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                          el.classList.add('flash-highlight-danger')
+                          setTimeout(() => el.classList.remove('flash-highlight-danger'), 2000)
+                        }
+                      }
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <strong>{t('fridge.table.expiration')}</strong>
+                  {formatDate(detailIngredient.nearestExpirationDate, language)}
+                </span>
+              ) : null}
+              {!detailIngredient.nearestBestBeforeDate && !detailIngredient.nearestExpirationDate ? (
+                <span>
+                  <strong>{t('fridge.table.expiration')}</strong>
+                  -
+                </span>
+              ) : null}
             </div>
 
             <div className="ingredient-detail-list">
               {detailIngredient.items.map((item, index) => (
                 <article
                   key={item.inventoryId ?? `${item.name}-${index}`}
+                  id={`detail-item-${index}`}
                   className="ingredient-detail-item"
                 >
                   <div>
@@ -1320,7 +1416,7 @@ export function FridgePage({
                       <dt>{t('fridge.table.expiration')}</dt>
                       <dd>{formatDate(item.expirationDate, language)}</dd>
                     </div>
-                    <div>
+                    <div className="detail-item-memo">
                       <dt>{t('fridge.table.memo')}</dt>
                       <dd>{item.memo ?? '-'}</dd>
                     </div>

@@ -46,15 +46,79 @@ export function RecipeGeneratePage({
   onSelectRecipe,
 }: RecipeGeneratePageProps) {
   const { language, t } = useI18n()
-  const [ingredients, setIngredients] = useState<Ingredient[]>([])
-  const [recipes, setRecipes] = useState<Recipe[]>([])
-  const [preferences, setPreferences] =
-    useState<UserPreferences>(defaultPreferences)
-  const [servings, setServings] = useState(defaultPreferences.defaultServings)
+  const [ingredients, setIngredients] = useState<Ingredient[]>(() => {
+    const cacheKey = `recipe-generate:${language}`
+    const cached = getCache<{
+      ingredients: Ingredient[]
+      recipes: Recipe[]
+      preferences: UserPreferences
+    }>(cacheKey)
+    return cached?.ingredients ?? []
+  })
+  const [recipes, setRecipes] = useState<Recipe[]>(() => {
+    const cacheKey = `recipe-generate:${language}`
+    const cached = getCache<{
+      ingredients: Ingredient[]
+      recipes: Recipe[]
+      preferences: UserPreferences
+    }>(cacheKey)
+    return cached?.recipes ?? []
+  })
+  const [preferences, setPreferences] = useState<UserPreferences>(() => {
+    const cacheKey = `recipe-generate:${language}`
+    const cached = getCache<{
+      ingredients: Ingredient[]
+      recipes: Recipe[]
+      preferences: UserPreferences
+    }>(cacheKey)
+    return cached?.preferences ?? defaultPreferences
+  })
+  const [servings, setServings] = useState(() => {
+    const cacheKey = `recipe-generate:${language}`
+    const cached = getCache<{
+      ingredients: Ingredient[]
+      recipes: Recipe[]
+      preferences: UserPreferences
+    }>(cacheKey)
+    return cached?.preferences.defaultServings ?? defaultPreferences.defaultServings
+  })
+  const [isLoading, setIsLoading] = useState(() => {
+    const cacheKey = `recipe-generate:${language}`
+    const cached = getCache<{
+      ingredients: Ingredient[]
+      recipes: Recipe[]
+      preferences: UserPreferences
+    }>(cacheKey)
+    return !cached
+  })
+
+  const [prevLanguage, setPrevLanguage] = useState(language)
+  if (language !== prevLanguage) {
+    setPrevLanguage(language)
+    const cacheKey = `recipe-generate:${language}`
+    const cached = getCache<{
+      ingredients: Ingredient[]
+      recipes: Recipe[]
+      preferences: UserPreferences
+    }>(cacheKey)
+    if (cached) {
+      setIngredients(cached.ingredients)
+      setRecipes(cached.recipes)
+      setPreferences(cached.preferences)
+      setServings(cached.preferences.defaultServings)
+      setIsLoading(false)
+    } else {
+      setIngredients([])
+      setRecipes([])
+      setPreferences(defaultPreferences)
+      setServings(defaultPreferences.defaultServings)
+      setIsLoading(true)
+    }
+  }
+
   const [cookingRequest, setCookingRequest] = useState('')
   const [statusMessage, setStatusMessage] = useState('')
   const [toastMessage, setToastMessage] = useState('')
-  const [isLoading, setIsLoading] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const toastTimerRef = useRef<number | null>(null)
 
@@ -72,13 +136,6 @@ export function RecipeGeneratePage({
       recipes: Recipe[]
       preferences: UserPreferences
     }>(cacheKey)
-    if (cached) {
-      setIngredients(cached.ingredients)
-      setRecipes(cached.recipes)
-      setPreferences(cached.preferences)
-      setServings(cached.preferences.defaultServings)
-      setIsLoading(false)
-    }
 
     async function loadPageData() {
       setIsLoading(!cached)
@@ -122,7 +179,7 @@ export function RecipeGeneratePage({
     return () => {
       isMounted = false
     }
-  }, [language])
+  }, [language, t])
 
   useEffect(() => {
     function handlePreferencesUpdated(event: Event) {
